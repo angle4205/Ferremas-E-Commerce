@@ -1,0 +1,41 @@
+-- 1. Clonar el repositorio
+
+>git clone https://github.com/angle4205/Ferremas-E-Commerce
+>cd Ferremas-E-Commerce
+
+-- 2. Levantar el backend (Django)
+
+>cd backend
+
+## Crea y activa el entorno virtual:
+>python -m venv venv
+>venv\Scripts\activate
+
+## Instala las dependencias de Python:
+>pip install -r requirements.txt
+
+## Aplica las migraciones, inicia el servidor:
+>python manage.py migrate
+>python manage.py runserver
+
+-- 3. Levantar el frontend (Vite + React)
+
+>cd frontend
+
+## Instala las dependencias de Node.js:
+>npm install
+
+## Para visualizar el front en desarrollo: 
+>npm run dev
+
+## Para generar el build del front:
+>npm run build
+
+## La build se creara en dist/, para pasarla al backend
+## hay un script, ejecuta en /backend/move_build.py
+>cd..
+>cd backend
+>python move_build.py
+
+# Esto movera la build del frontend al backend y asi
+# Django podra servir el frontend compilado.
