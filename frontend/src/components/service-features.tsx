@@ -26,29 +26,29 @@ export const ServiceFeatures: React.FC = () => {
   const features = [
     {
       icon: "lucide:truck",
-      title: "Free Delivery",
-      description: "Free shipping on all orders over $75"
+      title: "Envíos rápidos y de calidad",
+      description: "Despachamos a todo Chile con rapidez y seguridad."
     },
     {
       icon: "lucide:shield-check",
-      title: "Quality Guarantee",
-      description: "All products come with a 2-year warranty"
+      title: "Garantía de calidad",
+      description: "Todos nuestros productos cuentan con garantía y respaldo."
     },
     {
       icon: "lucide:refresh-cw",
-      title: "Easy Returns",
-      description: "30-day money back guarantee"
+      title: "Cambios y devoluciones fáciles",
+      description: "Tienes 30 días para cambios o devoluciones sin complicaciones."
     },
     {
       icon: "lucide:headphones",
-      title: "Expert Support",
-      description: "Professional advice from our specialists"
+      title: "Asesoría experta",
+      description: "Recibe atención profesional de nuestros especialistas."
     }
   ];
 
   return (
     <section className="mb-16">
-      <h2 className="text-2xl font-bold mb-6">Why Shop With Us</h2>
+      <h2 className="text-2xl font-bold mb-6">¿Por qué elegir FERREMAS?</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {features.map((feature, index) => (
           <FeatureCard 

@@ -1,5 +1,5 @@
 import React from "react";
-import { Navbar, NavbarBrand, NavbarContent, NavbarItem, Button, Link, Input, Badge, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Card, CardBody, Image } from "@heroui/react";
+import { Navbar, NavbarBrand, NavbarContent, NavbarItem, Button, Link, Input, Badge } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { FeaturedCategories } from "./components/featured-categories";
 import { HeroSection } from "./components/hero-section";
@@ -10,49 +10,39 @@ import { Footer } from "./components/footer";
 import { CatalogPage } from "./components/catalog-page";
 
 export default function App() {
-  // Add state to track current page
-  const [currentPage, setCurrentPage] = React.useState("home");
+  // Estado para la página actual
+  const [currentPage, setCurrentPage] = React.useState("inicio");
   
-  // Function to handle page navigation
+  // Función para cambiar de página
   const navigateTo = (page: string) => {
     setCurrentPage(page);
   };
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Navigation */}
+      {/* Barra de navegación */}
       <Navbar maxWidth="xl" isBordered className="bg-background">
         <NavbarBrand>
           <Icon icon="lucide:hammer" className="text-primary text-2xl" />
           <p className="font-bold text-inherit ml-2">FERREMAS+</p>
         </NavbarBrand>
         <NavbarContent className="hidden sm:flex gap-4" justify="center">
-          <NavbarItem isActive={currentPage === "home"}>
+          <NavbarItem isActive={currentPage === "inicio"}>
             <Link 
-              color={currentPage === "home" ? "primary" : "foreground"} 
+              color={currentPage === "inicio" ? "primary" : "foreground"} 
               href="#"
-              onClick={() => navigateTo("home")}
+              onClick={() => navigateTo("inicio")}
             >
-              Home
+              Inicio
             </Link>
           </NavbarItem>
-          <NavbarItem isActive={currentPage === "catalog"}>
+          <NavbarItem isActive={currentPage === "catalogo"}>
             <Link 
-              color={currentPage === "catalog" ? "primary" : "foreground"} 
+              color={currentPage === "catalogo" ? "primary" : "foreground"} 
               href="#"
-              onClick={() => navigateTo("catalog")}
+              onClick={() => navigateTo("catalogo")}
             >
-              Catalog
-            </Link>
-          </NavbarItem>
-          <NavbarItem>
-            <Link color="foreground" href="#">
-              Deals
-            </Link>
-          </NavbarItem>
-          <NavbarItem>
-            <Link color="foreground" href="#">
-              Services
+              Catálogo
             </Link>
           </NavbarItem>
         </NavbarContent>
@@ -65,7 +55,7 @@ export default function App() {
                 input: "text-small",
                 inputWrapper: "h-full font-normal text-default-500 bg-default-100",
               }}
-              placeholder="Search for products..."
+              placeholder="Buscar productos..."
               size="sm"
               startContent={<Icon icon="lucide:search" size={18} />}
               type="search"
@@ -87,30 +77,30 @@ export default function App() {
       </Navbar>
 
       <main className="container mx-auto px-4 py-4">
-        {currentPage === "home" ? (
+        {currentPage === "inicio" ? (
           <>
-            {/* Hero Section */}
+            {/* Sección principal */}
             <HeroSection />
             
-            {/* Featured Categories */}
+            {/* Categorías destacadas */}
             <FeaturedCategories />
             
-            {/* Popular Products */}
+            {/* Productos populares */}
             <PopularProducts />
             
-            {/* Promo Banner */}
+            {/* Banner promocional */}
             <PromoBanner />
             
-            {/* Service Features */}
+            {/* Características de servicio */}
             <ServiceFeatures />
           </>
-        ) : currentPage === "catalog" ? (
+        ) : currentPage === "catalogo" ? (
           <CatalogPage />
         ) : null}
       </main>
       
-      {/* Footer */}
-      <Footer />
+      {/* Pie de página */}
+      <Footer navigateTo={navigateTo} />
     </div>
   );
 }

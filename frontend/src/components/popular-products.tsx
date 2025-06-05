@@ -2,164 +2,119 @@ import React from "react";
 import { Card, CardBody, CardFooter, Button, Chip } from "@heroui/react";
 import { Icon } from "@iconify/react";
 
-interface Product {
+interface Producto {
   id: number;
-  name: string;
-  price: number;
+  nombre: string;
+  marca: string;
+  valor: number;
   originalPrice?: number;
-  rating: number;
-  image: string;
+  imagen_principal: string;
   isNew?: boolean;
   isBestSeller?: boolean;
+  categoria: string;
 }
 
-const ProductCard: React.FC<{ product: Product }> = ({ product }) => {
-  return (
-    <Card className="w-full" isPressable disableRipple>
-      <CardBody className="p-0 overflow-hidden">
-        <div className="relative">
-          {product.isNew && (
-            <Chip 
-              color="primary" 
-              variant="flat" 
-              size="sm" 
-              className="absolute top-2 left-2 z-10"
-            >
-              New
-            </Chip>
+const ProductCard: React.FC<{ producto: Producto }> = ({ producto }) => (
+  <Card className="w-full" isPressable disableRipple>
+    <CardBody className="p-0 overflow-hidden">
+      <div className="relative">
+        {producto.isNew && (
+          <Chip
+            color="primary"
+            variant="flat"
+            size="sm"
+            className="absolute top-2 left-2 z-10"
+          >
+            Nuevo
+          </Chip>
+        )}
+        {producto.isBestSeller && (
+          <Chip
+            color="warning"
+            variant="flat"
+            size="sm"
+            className="absolute top-2 left-2 z-10"
+          >
+            Más vendido
+          </Chip>
+        )}
+        <img
+          src={
+            producto.imagen_principal.startsWith("http")
+              ? producto.imagen_principal
+              : `http://localhost:8000${producto.imagen_principal}`
+          }
+          alt={producto.nombre}
+          className="w-full aspect-square object-contain bg-white"
+        />
+      </div>
+      <div className="p-4">
+        <span className="block text-xs text-default-400 mb-1">{producto.marca}</span>
+        <h3 className="font-medium text-foreground/90 line-clamp-1">{producto.nombre}</h3>
+        <div className="flex items-center gap-2 mt-2">
+          <span className="font-semibold">${producto.valor.toLocaleString("es-CL")}</span>
+          {producto.originalPrice && (
+            <span className="text-default-500 text-sm line-through">
+              ${producto.originalPrice.toLocaleString("es-CL")}
+            </span>
           )}
-          {product.isBestSeller && (
-            <Chip 
-              color="warning" 
-              variant="flat" 
-              size="sm" 
-              className="absolute top-2 left-2 z-10"
-            >
-              Best Seller
-            </Chip>
-          )}
-          <img 
-            src={product.image} 
-            alt={product.name} 
-            className="w-full aspect-square object-cover"
-          />
         </div>
-        <div className="p-4">
-          <h3 className="font-medium text-foreground/90 line-clamp-1">{product.name}</h3>
-          <div className="flex items-center mt-1 mb-2">
-            {[...Array(5)].map((_, i) => (
-              <Icon 
-                key={i} 
-                icon={i < product.rating ? "lucide:star" : "lucide:star"} 
-                className={i < product.rating ? "text-warning" : "text-default-300"} 
-                size={14} 
-              />
-            ))}
-            <span className="text-default-500 text-xs ml-1">({Math.floor(Math.random() * 500) + 10})</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="font-semibold">${product.price.toFixed(2)}</span>
-            {product.originalPrice && (
-              <span className="text-default-500 text-sm line-through">${product.originalPrice.toFixed(2)}</span>
-            )}
-          </div>
-        </div>
-      </CardBody>
-      <CardFooter className="pt-0">
-        <Button 
-          fullWidth 
-          color="primary" 
-          variant="flat"
-          startContent={<Icon icon="lucide:shopping-cart" size={18} />}
-        >
-          Add to Cart
-        </Button>
-      </CardFooter>
-    </Card>
-  );
-};
+      </div>
+    </CardBody>
+    <CardFooter className="pt-0">
+      <Button
+        fullWidth
+        color="primary"
+        variant="flat"
+        startContent={<Icon icon="lucide:shopping-cart" size={18} />}
+      >
+        Agregar al carrito
+      </Button>
+    </CardFooter>
+  </Card>
+);
 
 export const PopularProducts: React.FC = () => {
-  const products: Product[] = [
-    {
-      id: 1,
-      name: "Professional Cordless Drill Set",
-      price: 129.99,
-      originalPrice: 159.99,
-      rating: 4.5,
-      image: "https://img.heroui.chat/image/tools?w=400&h=400&u=6",
-      isBestSeller: true
-    },
-    {
-      id: 2,
-      name: "Premium Tool Box with Organizer",
-      price: 79.99,
-      rating: 4,
-      image: "https://img.heroui.chat/image/tools?w=400&h=400&u=7"
-    },
-    {
-      id: 3,
-      name: "Heavy Duty Work Gloves",
-      price: 24.99,
-      originalPrice: 34.99,
-      rating: 4.5,
-      image: "https://img.heroui.chat/image/tools?w=400&h=400&u=8"
-    },
-    {
-      id: 4,
-      name: "Precision Screwdriver Set",
-      price: 49.99,
-      rating: 5,
-      image: "https://img.heroui.chat/image/tools?w=400&h=400&u=9",
-      isNew: true
-    },
-    {
-      id: 5,
-      name: "Digital Laser Measuring Tool",
-      price: 89.99,
-      originalPrice: 109.99,
-      rating: 4,
-      image: "https://img.heroui.chat/image/tools?w=400&h=400&u=10"
-    },
-    {
-      id: 6,
-      name: "Adjustable Wrench Set",
-      price: 39.99,
-      rating: 4.5,
-      image: "https://img.heroui.chat/image/tools?w=400&h=400&u=11"
-    },
-    {
-      id: 7,
-      name: "Smart Home Electrical Kit",
-      price: 149.99,
-      rating: 5,
-      image: "https://img.heroui.chat/image/tools?w=400&h=400&u=12",
-      isNew: true
-    },
-    {
-      id: 8,
-      name: "Professional Safety Helmet",
-      price: 34.99,
-      rating: 4,
-      image: "https://img.heroui.chat/image/tools?w=400&h=400&u=13"
-    }
-  ];
+  const [productos, setProductos] = React.useState<Producto[]>([]);
+  const [cargando, setCargando] = React.useState(true);
+
+  React.useEffect(() => {
+    setCargando(true);
+    fetch("http://localhost:8000/api/productos/")
+      .then(res => res.json())
+      .then(data => {
+        setProductos(
+          data.map((item: any) => ({
+            id: item.id,
+            nombre: item.nombre,
+            marca: item.marca,
+            valor: Number(item.valor),
+            originalPrice: undefined,
+            imagen_principal: item.imagen_principal,
+            isNew: false,
+            isBestSeller: false,
+            categoria: item.categoria,
+          }))
+        );
+        setCargando(false);
+      });
+  }, []);
 
   return (
     <section className="mb-16">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold">Popular Products</h2>
-        <Button 
-          variant="light" 
+        <h2 className="text-2xl font-bold">Productos populares</h2>
+        <Button
+          variant="light"
           color="primary"
           endContent={<Icon icon="lucide:arrow-right" />}
         >
-          View All
+          Ver todos
         </Button>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {products.map((product) => (
-          <ProductCard key={product.id} product={product} />
+        {productos.slice(0, 8).map((producto) => (
+          <ProductCard key={producto.id} producto={producto} />
         ))}
       </div>
     </section>

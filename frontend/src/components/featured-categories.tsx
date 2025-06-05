@@ -44,47 +44,63 @@ const CategoryCard: React.FC<CategoryCardProps> = ({ title, icon, image }) => {
 };
 
 export const FeaturedCategories: React.FC = () => {
+  // Categorías reales de Ferremas
   const categories = [
     { 
-      title: "Power Tools", 
+      title: "Herramientas Eléctricas", 
       icon: "lucide:drill", 
-      image: "https://img.heroui.chat/image/tools?w=400&h=300&u=2" 
+      image: "https://img.heroui.chat/image/tools?w=400&h=300&u=2"
     },
     { 
-      title: "Hand Tools", 
+      title: "Herramientas Manuales", 
       icon: "lucide:hammer", 
-      image: "https://img.heroui.chat/image/tools?w=400&h=300&u=3" 
+      image: "https://img.heroui.chat/image/tools?w=400&h=300&u=3"
     },
     { 
-      title: "Electrical", 
+      title: "Materiales Eléctricos", 
       icon: "lucide:lightbulb", 
-      image: "https://img.heroui.chat/image/tools?w=400&h=300&u=4" 
+      image: "https://img.heroui.chat/image/tools?w=400&h=300&u=4"
     },
     { 
-      title: "Plumbing", 
-      icon: "lucide:wrench", 
-      image: "https://img.heroui.chat/image/tools?w=400&h=300&u=5" 
+      title: "Fijación y Tornillería", 
+      icon: "lucide:screwdriver", 
+      image: "https://img.heroui.chat/image/tools?w=400&h=300&u=5"
     },
     { 
-      title: "Garden & Outdoor", 
+      title: "Jardín y Exteriores", 
       icon: "lucide:flower", 
-      image: "https://img.heroui.chat/image/landscape?w=400&h=300&u=1" 
+      image: "https://img.heroui.chat/image/landscape?w=400&h=300&u=1"
+    },
+    { 
+      title: "Pinturas y Adhesivos", 
+      icon: "lucide:paintbrush", 
+      image: "https://img.heroui.chat/image/paint?w=400&h=300&u=1"
+    },
+    { 
+      title: "Ferretería General", 
+      icon: "lucide:package", 
+      image: "https://img.heroui.chat/image/tools?w=400&h=300&u=6"
+    },
+    { 
+      title: "Seguridad Industrial", 
+      icon: "lucide:shield", 
+      image: "https://img.heroui.chat/image/helmet?w=400&h=300&u=1"
     }
   ];
 
   return (
     <section className="mb-16">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold">Shop by Category</h2>
+        <h2 className="text-2xl font-bold">Categorías destacadas</h2>
         <Button 
           variant="light" 
           color="primary"
           endContent={<Icon icon="lucide:arrow-right" />}
         >
-          View All
+          Ver todas
         </Button>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
         {categories.map((category, index) => (
           <CategoryCard 
             key={index} 

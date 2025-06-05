@@ -8,10 +8,10 @@ export const HeroSection: React.FC = () => {
       <div className="flex flex-col lg:flex-row items-center">
         <div className="p-8 lg:p-12 lg:w-1/2 z-10">
           <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
-            Professional Tools for Every Project
+            Todo para tu proyecto, en un solo lugar
           </h1>
           <p className="text-lg opacity-90 mb-8 max-w-md">
-            Find the right equipment for your next home improvement project with our premium selection of tools and hardware.
+            En FERREMAS encuentras herramientas, materiales y asesoría para construcción y ferretería. Más de 40 años acompañando a Chile con calidad y confianza.
           </p>
           <div className="flex flex-wrap gap-4">
             <Button 
@@ -20,14 +20,14 @@ export const HeroSection: React.FC = () => {
               size="lg"
               endContent={<Icon icon="lucide:arrow-right" />}
             >
-              Shop Now
+              Ver catálogo
             </Button>
             <Button 
               color="default" 
               variant="bordered" 
               size="lg"
             >
-              View Deals
+              Contáctanos
             </Button>
           </div>
         </div>
@@ -35,7 +35,7 @@ export const HeroSection: React.FC = () => {
           <div className="absolute inset-0 bg-gradient-to-r from-primary-500 to-transparent lg:hidden z-10"></div>
           <img 
             src="https://img.heroui.chat/image/tools?w=800&h=600&u=1" 
-            alt="Professional tools collection" 
+            alt="Colección de herramientas profesionales" 
             className="w-full h-full object-cover"
           />
         </div>
