@@ -28,14 +28,5 @@
 ## Para visualizar el front en desarrollo: 
 >npm run dev
 
-## Para generar el build del front:
+## Para generar el build del frontend en el backend:
 >npm run build
-
-## La build se creara en dist/, para pasarla al backend
-## hay un script, ejecuta en la raíz move_build.py
->cd..
->cd backend
->python move_build.py
-
-# Esto movera la build del frontend al backend y asi
-# Django podra servir el frontend compilado.
