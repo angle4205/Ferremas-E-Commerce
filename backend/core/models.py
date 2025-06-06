@@ -357,12 +357,20 @@ class Cart(models.Model):
         verbose_name_plural = _("Carritos")
 
     def clean(self):
-        # Validación de coherencia de totales
+        """
+        Valida la coherencia de los montos del carrito.
+        Permite una diferencia máxima absoluta de 1 CLP entre subtotal + iva y total,
+        para cubrir casos de redondeo inevitables por normativa chilena y uso de enteros en CLP.
+        No permite inconsistencias reales (diferencias mayores).
+        """
         if self.total < 0 or self.subtotal < 0 or self.iva < 0:
             raise ValidationError(_("Los montos no pueden ser negativos."))
-        if self.subtotal + self.iva != self.total:
-            raise ValidationError(_("El subtotal más el IVA debe ser igual al total."))
-
+        # Permitimos una diferencia de hasta 1 CLP por truncamiento
+        if abs((self.subtotal + self.iva) - self.total) > 1:
+            raise ValidationError(
+                _("El subtotal más el IVA debe ser igual al total.")
+            )
+    
     def calcular_totales(self):
         """
         Calcula subtotal, IVA y total del carrito según normativa chilena.
