@@ -1,23 +1,308 @@
-# core/views.py
 from django.views.generic import View
 from django.http import FileResponse, Http404
 import os
 from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from .models import Producto
+from rest_framework import status, permissions
+from rest_framework.generics import get_object_or_404
+from rest_framework.pagination import PageNumberPagination
+from .models import Producto, UserProfile, Pedido, ItemPedido
 from .serializers import ProductoSerializer
+from django.utils import timezone
+from django.db import models
+from rest_framework import serializers
+
+# --- Vistas de navegación ---
 
 class LandingView(View):
+    """Renderiza la landing page estática del proyecto."""
     def get(self, request, *args, **kwargs):
         index_path = os.path.join(settings.BASE_DIR, "core", "static", "landing", "index.html")
         try:
             return FileResponse(open(index_path, 'rb'), content_type='text/html')
         except FileNotFoundError:
             raise Http404("No se encontró index.html, ¿ejecutaste 'npm run build'?")
-        
+
 class ProductoListAPIView(APIView):
+    """
+    Lista todos los productos disponibles para el frontend.
+    """
     def get(self, request):
         productos = Producto.objects.filter(disponible=True)
         serializer = ProductoSerializer(productos, many=True, context={"request": request})
         return Response(serializer.data)
+
+# --- Permisos personalizados ---
+
+class IsEmpleado(permissions.BasePermission):
+    """Permite acceso solo a empleados autenticados."""
+    def has_permission(self, request, view):
+        return hasattr(request.user, "profile") and getattr(request.user.profile.rol, "nombre", None) == "EMPLEADO"
+
+class IsBodeguero(permissions.BasePermission):
+    """Permite acceso solo a empleados con subrol BODEGUERO."""
+    def has_permission(self, request, view):
+        return hasattr(request.user, "profile") and request.user.profile.tipo_empleado == "BODEGUERO"
+
+class IsContador(permissions.BasePermission):
+    """Permite acceso solo a empleados con subrol CONTADOR."""
+    def has_permission(self, request, view):
+        return hasattr(request.user, "profile") and request.user.profile.tipo_empleado == "CONTADOR"
+
+class IsAdminEmpleado(permissions.BasePermission):
+    """Permite acceso solo a empleados con rol ADMINISTRADOR."""
+    def has_permission(self, request, view):
+        return hasattr(request.user, "profile") and getattr(request.user.profile.rol, "nombre", None) == "ADMINISTRADOR"
+
+# --- Serializers mejorados ---
+
+class ProductoEnItemPedidoSerializer(serializers.ModelSerializer):
+    marca = serializers.StringRelatedField()
+    categoria = serializers.StringRelatedField()
+    class Meta:
+        model = Producto
+        fields = ["id", "nombre", "marca", "categoria", "valor"]
+
+class ItemPedidoSerializer(serializers.ModelSerializer):
+    producto = ProductoEnItemPedidoSerializer()
+    class Meta:
+        model = ItemPedido
+        fields = ["id", "producto", "cantidad", "precio_unitario"]
+
+class PedidoSimpleSerializer(serializers.ModelSerializer):
+    items = ItemPedidoSerializer(many=True, read_only=True)
+    cliente = serializers.SerializerMethodField()
+    direccion_envio = serializers.StringRelatedField()
+    class Meta:
+        model = Pedido
+        fields = [
+            "id", "estado", "fecha_creacion", "fecha_actualizacion", "total",
+            "cliente", "items", "metodo_retiro", "direccion_envio"
+        ]
+    def get_cliente(self, obj):
+        return obj.cliente.user.username if obj.cliente and obj.cliente.user else None
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    user = serializers.StringRelatedField()
+    rol = serializers.StringRelatedField()
+    sucursal = serializers.StringRelatedField()
+    class Meta:
+        model = UserProfile
+        fields = [
+            "id", "user", "rol", "tipo_empleado", "en_turno", "hora_entrada", "hora_salida", "sucursal", "profile_picture"
+        ]
+
+# --- Helpers privados y mixins ---
+
+def _respuesta_ok(data=None, mensaje="", status_code=status.HTTP_200_OK):
+    resp = {"success": True, "mensaje": mensaje}
+    if data is not None:
+        resp.update(data)
+    return Response(resp, status=status_code)
+
+def _respuesta_error(mensaje, status_code=status.HTTP_400_BAD_REQUEST):
+    return Response({"success": False, "mensaje": mensaje}, status=status_code)
+
+def _user_equiv(user1, user2):
+    """
+    Compara robustamente si dos usuarios son equivalentes, considerando User y UserProfile.
+    """
+    if user1 is None or user2 is None:
+        return False
+    # Si ambos son UserProfile
+    if isinstance(user1, UserProfile) and isinstance(user2, UserProfile):
+        return user1.pk == user2.pk
+    # Si ambos son User
+    if hasattr(user1, "pk") and hasattr(user2, "pk") and user1.__class__.__name__ == "User" and user2.__class__.__name__ == "User":
+        return user1.pk == user2.pk
+    # Si uno es User y otro UserProfile
+    if isinstance(user1, UserProfile) and hasattr(user2, "pk"):
+        return user1.user_id == user2.pk
+    if isinstance(user2, UserProfile) and hasattr(user1, "pk"):
+        return user2.user_id == user1.pk
+    return False
+
+def _bodeguero_asignado_equals_user(asignado, user):
+    """
+    Compara robustamente si el usuario autenticado es el bodeguero asignado al pedido.
+    Soporta asignado como User o UserProfile.
+    """
+    return _user_equiv(asignado, user) or _user_equiv(asignado, getattr(user, "profile", None))
+
+def _get_pedido_bodeguero(pedido_id, user):
+    pedido = get_object_or_404(
+        Pedido.objects.select_related("bodeguero_asignado", "cliente", "direccion_envio").prefetch_related("items__producto"),
+        id=pedido_id
+    )
+    if not _bodeguero_asignado_equals_user(pedido.bodeguero_asignado, user):
+        return None
+    return pedido
+
+def _validar_transicion_estado_pedido(estado_actual, nuevo_estado):
+    """
+    Valida reglas de negocio para transición de estados de pedido.
+    No permite saltos no permitidos ni estados administrativos.
+    """
+    flujo = {
+        "SOLICITADO": ["PREPARACION"],
+        "PREPARACION": ["ENVIADO", "LISTO_RETIRO"],
+        "ENVIADO": ["ENTREGADO"],
+        "LISTO_RETIRO": ["ENTREGADO"],
+        "ENTREGADO": [],
+    }
+    if nuevo_estado == "CANCELADO":
+        return False
+    return nuevo_estado in flujo.get(estado_actual, [])
+
+class PaginacionFerremas(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = "page_size"
+    max_page_size = 50
+
+# --- API Views ---
+
+class MarcarEntradaAPIView(APIView):
+    """
+    Permite a cualquier empleado marcar su entrada a turno.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsEmpleado]
+
+    def post(self, request):
+        empleado = getattr(request.user, "profile", None)
+        if not empleado:
+            return _respuesta_error("No se encontró el perfil de empleado.", status.HTTP_403_FORBIDDEN)
+        if empleado.en_turno:
+            return _respuesta_error("Ya estás en turno.", status.HTTP_400_BAD_REQUEST)
+        empleado.marcar_entrada()
+        serializer = UserProfileSerializer(empleado)
+        return _respuesta_ok({"empleado": serializer.data}, "Entrada a turno registrada correctamente.")
+
+class MarcarSalidaAPIView(APIView):
+    """
+    Permite a cualquier empleado marcar su salida de turno.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsEmpleado]
+
+    def post(self, request):
+        empleado = getattr(request.user, "profile", None)
+        if not empleado:
+            return _respuesta_error("No se encontró el perfil de empleado.", status.HTTP_403_FORBIDDEN)
+        if not empleado.en_turno:
+            return _respuesta_error("No estás en turno.", status.HTTP_400_BAD_REQUEST)
+        empleado.marcar_salida()
+        serializer = UserProfileSerializer(empleado)
+        return _respuesta_ok({"empleado": serializer.data}, "Salida de turno registrada correctamente.")
+
+class PerfilEmpleadoAPIView(APIView):
+    """
+    Devuelve el perfil y subrol del usuario autenticado.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsEmpleado]
+
+    def get(self, request):
+        empleado = getattr(request.user, "profile", None)
+        if not empleado:
+            return _respuesta_error("No se encontró el perfil de empleado.", status.HTTP_403_FORBIDDEN)
+        serializer = UserProfileSerializer(empleado)
+        return _respuesta_ok({"empleado": serializer.data})
+
+class BodegueroOrdenesAPIView(APIView):
+    """
+    Permite al bodeguero ver sus pedidos asignados, paginados.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsBodeguero]
+
+    def get(self, request):
+        bodeguero = request.user
+        # Incluye ambos tipos de asignación (User o UserProfile)
+        pedidos = Pedido.objects.filter(
+            models.Q(bodeguero_asignado=bodeguero) | models.Q(bodeguero_asignado=getattr(bodeguero, "profile", None))
+        ).select_related("cliente", "direccion_envio").prefetch_related("items__producto").order_by("-fecha_creacion")
+        paginator = PaginacionFerremas()
+        page = paginator.paginate_queryset(pedidos, request)
+        serializer = PedidoSimpleSerializer(page, many=True)
+        return paginator.get_paginated_response({
+            "success": True,
+            "pedidos": serializer.data,
+            "mensaje": "Pedidos asignados listados correctamente."
+        })
+
+class BodegueroOrdenEstadoAPIView(APIView):
+    """
+    Permite al bodeguero cambiar el estado de un pedido asignado, validando el nuevo estado y la transición.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsBodeguero]
+    ESTADOS_PERMITIDOS = ["PREPARACION", "ENVIADO", "ENTREGADO", "LISTO_RETIRO"]
+
+    def patch(self, request, pedido_id):
+        bodeguero = request.user
+        pedido = _get_pedido_bodeguero(pedido_id, bodeguero)
+        if not pedido:
+            return _respuesta_error("No tienes permiso para modificar este pedido.", status.HTTP_403_FORBIDDEN)
+        nuevo_estado = request.data.get("estado")
+        if not nuevo_estado:
+            return _respuesta_error("Debes indicar el nuevo estado.", status.HTTP_400_BAD_REQUEST)
+        if nuevo_estado not in self.ESTADOS_PERMITIDOS:
+            return _respuesta_error("Estado no permitido para el bodeguero.", status.HTTP_400_BAD_REQUEST)
+        if pedido.estado == nuevo_estado:
+            return _respuesta_error("El pedido ya está en ese estado.", status.HTTP_400_BAD_REQUEST)
+        if not _validar_transicion_estado_pedido(pedido.estado, nuevo_estado):
+            return _respuesta_error("Transición de estado no permitida según el flujo de trabajo.", status.HTTP_400_BAD_REQUEST)
+        pedido.actualizar_estado(nuevo_estado, bodeguero)
+        serializer = PedidoSimpleSerializer(pedido)
+        return _respuesta_ok({"pedido": serializer.data}, "Estado del pedido actualizado.")
+
+class ContadorReportesAPIView(APIView):
+    """
+    Permite al contador ver reportes financieros básicos.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsContador]
+
+    def get(self, request):
+        total_ventas = Pedido.objects.filter(estado="ENTREGADO").aggregate(total=models.Sum("total"))["total"] or 0
+        pedidos_entregados = Pedido.objects.filter(estado="ENTREGADO").count()
+        pedidos_cancelados = Pedido.objects.filter(estado="CANCELADO").count()
+        return _respuesta_ok({
+            "total_ventas": total_ventas,
+            "pedidos_entregados": pedidos_entregados,
+            "pedidos_cancelados": pedidos_cancelados,
+        }, "Reporte financiero generado correctamente.")
+
+class AdminEmpleadosListAPIView(APIView):
+    """
+    Permite al administrador listar todos los empleados, paginados.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdminEmpleado]
+
+    def get(self, request):
+        empleados = UserProfile.objects.select_related("user", "rol", "sucursal").all().order_by("user__username")
+        paginator = PaginacionFerremas()
+        page = paginator.paginate_queryset(empleados, request)
+        serializer = UserProfileSerializer(page, many=True)
+        return paginator.get_paginated_response({
+            "success": True,
+            "empleados": serializer.data,
+            "mensaje": "Empleados listados correctamente."
+        })
+
+class AdminEmpleadoDetailAPIView(APIView):
+    """
+    Permite al administrador ver el detalle de un empleado.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdminEmpleado]
+
+    def get(self, request, empleado_id):
+        empleado = get_object_or_404(UserProfile.objects.select_related("user", "rol", "sucursal"), id=empleado_id)
+        serializer = UserProfileSerializer(empleado)
+        return _respuesta_ok({"empleado": serializer.data})
+
+# --- Rutas sugeridas para urls.py ---
+# path('api/empleados/marcar_entrada/', MarcarEntradaAPIView.as_view()),
+# path('api/empleados/marcar_salida/', MarcarSalidaAPIView.as_view()),
+# path('api/empleados/perfil/', PerfilEmpleadoAPIView.as_view()),
+# path('api/bodeguero/ordenes/', BodegueroOrdenesAPIView.as_view()),
+# path('api/bodeguero/ordenes/<int:pedido_id>/', BodegueroOrdenEstadoAPIView.as_view()),
+# path('api/contador/reportes/', ContadorReportesAPIView.as_view()),
+# path('api/admin/empleados/', AdminEmpleadosListAPIView.as_view()),
+# path('api/admin/empleados/<int:empleado_id>/', AdminEmpleadoDetailAPIView.as_view()),
