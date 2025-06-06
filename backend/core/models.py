@@ -18,14 +18,12 @@ from django.utils.translation import gettext_lazy as _
 
 class Rol(models.Model):
     """
-    Define los roles del sistema: Cliente, Administrador, Vendedor, Bodeguero, Contador.
+    Define los roles del sistema: Cliente, Administrador, Empleado.
     """
     ROL_CHOICES = [
         ("CLIENTE", _("Cliente")),
         ("ADMINISTRADOR", _("Administrador")),
-        ("VENDEDOR", _("Vendedor")),
-        ("BODEGUERO", _("Bodeguero")),
-        ("CONTADOR", _("Contador")),
+        ("EMPLEADO", _("Empleado")),
     ]
     nombre = models.CharField(
         max_length=20, choices=ROL_CHOICES, unique=True,
@@ -95,13 +93,20 @@ class Marca(models.Model):
         return self.nombre
 
 # --------------------------
-# USER, PROFILE, ADDRESS
+# USERPROFILE (EMPLEADO GENERALIZADO CON SUBROLES)
 # --------------------------
 
 class UserProfile(models.Model):
     """
-    Perfil extendido de usuario, con rol y sucursal (si aplica).
+    Perfil extendido de usuario, con rol general y subrol/tipo_empleado para empleados.
+    Si el usuario es empleado, puede tener subrol: BODEGUERO, CONTADOR o EMPLEADO.
     """
+    SUBROL_CHOICES = [
+        ("BODEGUERO", _("Bodeguero")),
+        ("CONTADOR", _("Contador")),
+        ("EMPLEADO", _("Empleado")),
+        (None, _("Sin subrol")),  # Para usuarios que no son empleados
+    ]
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
     rol = models.ForeignKey(Rol, on_delete=models.SET_NULL, null=True, verbose_name=_("Rol"))
     sucursal = models.ForeignKey(Sucursal, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Sucursal"))
@@ -110,6 +115,14 @@ class UserProfile(models.Model):
     )
     recibe_ofertas = models.BooleanField(default=True, verbose_name=_("Recibe ofertas"))
     recibe_notificaciones = models.BooleanField(default=True, verbose_name=_("Recibe notificaciones"))
+    # Campos para empleados
+    tipo_empleado = models.CharField(
+        max_length=20, choices=SUBROL_CHOICES, null=True, blank=True, verbose_name=_("Subrol de empleado")
+    )
+    en_turno = models.BooleanField(default=False, verbose_name=_("¿En turno?"))
+    hora_entrada = models.DateTimeField(null=True, blank=True, verbose_name=_("Hora de entrada"))
+    hora_salida = models.DateTimeField(null=True, blank=True, verbose_name=_("Hora de salida"))
+    comprobante_entrada = models.FileField(upload_to="comprobantes_empleado/", blank=True, null=True, verbose_name=_("Comprobante de entrada"))
 
     class Meta:
         verbose_name = _("Perfil de usuario")
@@ -123,6 +136,47 @@ class UserProfile(models.Model):
         if default_address:
             return f"{default_address.address}"
         return _("Sin dirección predeterminada")
+
+    # Métodos de turnos (para todos los empleados)
+    def marcar_entrada(self, comprobante=None):
+        """
+        Marca la entrada a turno para cualquier empleado.
+        """
+        from django.utils import timezone
+        self.en_turno = True
+        self.hora_entrada = timezone.now()
+        if comprobante:
+            self.comprobante_entrada = comprobante
+        self.save()
+        enviar_email_confirmacion_turno_empleado(self)
+
+    def marcar_salida(self):
+        """
+        Marca la salida de turno para cualquier empleado.
+        """
+        from django.utils import timezone
+        self.en_turno = False
+        self.hora_salida = timezone.now()
+        self.save()
+        enviar_email_salida_turno_empleado(self)
+
+    # Funcionalidad específica según subrol
+    def pedidos_en_proceso(self):
+        """
+        Solo para bodeguero: retorna los pedidos asignados en estado PREPARACION o SOLICITADO.
+        """
+        if self.tipo_empleado == "BODEGUERO":
+            return Pedido.objects.filter(bodeguero_asignado=self.user, estado__in=["PREPARACION", "SOLICITADO"])
+        return Pedido.objects.none()
+
+    def puede_gestionar_pedidos(self):
+        return self.tipo_empleado == "BODEGUERO"
+
+    def puede_ver_reportes(self):
+        return self.tipo_empleado == "CONTADOR"
+
+    def es_empleado_simple(self):
+        return self.tipo_empleado == "EMPLEADO"
 
 # Señal robusta para crear/guardar UserProfile automáticamente
 @receiver(post_save, sender=User)
@@ -365,12 +419,12 @@ class Cart(models.Model):
         """
         if self.total < 0 or self.subtotal < 0 or self.iva < 0:
             raise ValidationError(_("Los montos no pueden ser negativos."))
-        # Permitimos una diferencia de hasta 1 CLP por truncamiento
+        # Permitimos una diferencia de hasta 1 CLP por redondeo/truncamiento
         if abs((self.subtotal + self.iva) - self.total) > 1:
             raise ValidationError(
-                _("El subtotal más el IVA debe ser igual al total.")
+                _("El subtotal más el IVA debe ser igual al total (se permite una diferencia máxima de 1 CLP por redondeo).")
             )
-    
+
     def calcular_totales(self):
         """
         Calcula subtotal, IVA y total del carrito según normativa chilena.
@@ -497,7 +551,7 @@ class Pedido(models.Model):
         """
         Lógica para asignar automáticamente un bodeguero disponible.
         """
-        bodegueros = UserProfile.objects.filter(rol__nombre="BODEGUERO", bodeguero__en_turno=True)
+        bodegueros = UserProfile.objects.filter(rol__nombre="EMPLEADO", tipo_empleado="BODEGUERO", en_turno=True)
         bodeguero_menos_carga = None
         min_pedidos = None
         for b in bodegueros:
@@ -582,66 +636,6 @@ class Pago(models.Model):
         return f"Pago {self.stripe_id} - {self.estado}"
 
 # --------------------------
-# EMPLEADOS Y TURNOS
-# --------------------------
-
-class Bodeguero(models.Model):
-    """
-    Perfil extendido para bodeguero, con tracking de turnos.
-    """
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="bodeguero", verbose_name=_("Usuario"))
-    en_turno = models.BooleanField(default=False, verbose_name=_("¿En turno?"))
-    hora_entrada = models.DateTimeField(null=True, blank=True, verbose_name=_("Hora de entrada"))
-    hora_salida = models.DateTimeField(null=True, blank=True, verbose_name=_("Hora de salida"))
-    comprobante_entrada = models.FileField(upload_to="comprobantes_bodeguero/", blank=True, null=True, verbose_name=_("Comprobante de entrada"))
-
-    class Meta:
-        verbose_name = _("Bodeguero")
-        verbose_name_plural = _("Bodegueros")
-
-    def marcar_entrada(self, comprobante=None):
-        from django.utils import timezone
-        self.en_turno = True
-        self.hora_entrada = timezone.now()
-        if comprobante:
-            self.comprobante_entrada = comprobante
-        self.save()
-        # Aquí se podría enviar email de confirmación
-
-    def marcar_salida(self):
-        from django.utils import timezone
-        self.en_turno = False
-        self.hora_salida = timezone.now()
-        self.save()
-
-    def pedidos_en_proceso(self):
-        return Pedido.objects.filter(bodeguero_asignado=self.user, estado__in=["PREPARACION", "SOLICITADO"])
-
-    def __str__(self):
-        return f"Bodeguero: {self.user.username} ({'En turno' if self.en_turno else 'Fuera de turno'})"
-
-class Vendedor(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="vendedor", verbose_name=_("Usuario"))
-    sucursal = models.ForeignKey(Sucursal, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Sucursal"))
-
-    class Meta:
-        verbose_name = _("Vendedor")
-        verbose_name_plural = _("Vendedores")
-
-    def __str__(self):
-        return f"Vendedor: {self.user.username}"
-
-class Contador(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="contador", verbose_name=_("Usuario"))
-
-    class Meta:
-        verbose_name = _("Contador")
-        verbose_name_plural = _("Contadores")
-
-    def __str__(self):
-        return f"Contador: {self.user.username}"
-
-# --------------------------
 # AUDITORÍA DE CAMBIOS EN MODELOS
 # --------------------------
 
@@ -672,8 +666,11 @@ class AuditoriaCambio(models.Model):
 def enviar_email_bienvenida(cliente):
     print(f"[EMAIL] Bienvenida enviada a {cliente.email}")
 
-def enviar_email_confirmacion_turno(bodeguero):
-    print(f"[EMAIL] Confirmación de entrada a turno enviada a {bodeguero.user.email} (comprobante: {bodeguero.comprobante_entrada})")
+def enviar_email_confirmacion_turno_empleado(empleado):
+    print(f"[EMAIL] Confirmación de entrada a turno enviada a {empleado.user.email} (comprobante: {empleado.comprobante_entrada})")
+
+def enviar_email_salida_turno_empleado(empleado):
+    print(f"[EMAIL] Salida de turno registrada para {empleado.user.email} - {empleado.hora_salida}")
 
 def enviar_email_pago_confirmado(cliente, pedido):
     print(f"[EMAIL] Pago confirmado para {cliente.email} - Pedido #{pedido.id}")
@@ -684,6 +681,22 @@ def enviar_oferta_especial(cliente, pedido):
 # --------------------------
 # SIGNALS
 # --------------------------
+
+@receiver(post_save, sender=UserProfile)
+def email_confirmacion_entrada_turno_empleado(sender, instance, **kwargs):
+    """
+    Envía email de confirmación cuando un empleado marca entrada a turno.
+    """
+    if instance.en_turno and instance.hora_entrada and instance.comprobante_entrada:
+        enviar_email_confirmacion_turno_empleado(instance)
+
+@receiver(post_save, sender=UserProfile)
+def email_confirmacion_salida_turno_empleado(sender, instance, **kwargs):
+    """
+    Envía email de confirmación cuando un empleado marca salida de turno.
+    """
+    if not instance.en_turno and instance.hora_salida:
+        enviar_email_salida_turno_empleado(instance)
 
 @receiver(pre_save, sender=Pedido)
 def auditar_cambio_estado_pedido(sender, instance, **kwargs):
@@ -713,14 +726,6 @@ def enviar_bienvenida_cliente(sender, instance, created, **kwargs):
     """
     if created:
         enviar_email_bienvenida(instance)
-
-@receiver(post_save, sender=Bodeguero)
-def email_confirmacion_entrada_turno(sender, instance, **kwargs):
-    """
-    Envía email de confirmación cuando un Bodeguero marca entrada a turno.
-    """
-    if instance.en_turno and instance.hora_entrada and instance.comprobante_entrada:
-        enviar_email_confirmacion_turno(instance)
 
 @receiver(post_save, sender=ValoracionProducto)
 def recalcular_promedio_valoracion(sender, instance, created, **kwargs):
