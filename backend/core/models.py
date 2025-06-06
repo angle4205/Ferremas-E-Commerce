@@ -368,6 +368,7 @@ class Cart(models.Model):
         Calcula subtotal, IVA y total del carrito según normativa chilena.
         Todos los valores son en CLP (sin decimales).
         El precio de cada producto ya incluye IVA.
+        Debes llamar a save() luego de este método para guardar los cambios.
         """
         items = self.items.all()
         total = sum(item.subtotal() for item in items)
@@ -386,13 +387,14 @@ class Cart(models.Model):
 
     def total_para_stripe(self):
         """
-        Devuelve el total ajustado al múltiplo de 50 más cercano (requerido por Stripe CLP).
+        Devuelve el total truncado al múltiplo de 50 inferior más cercano (requerido por Stripe CLP).
+        Así nunca se cobra de más al cliente.
         """
-        return int(Decimal(self.total).quantize(Decimal('1'), rounding=ROUND_HALF_UP) / 50) * 50
+        return int(self.total // 50) * 50
 
     def ajuste_stripe(self):
         """
-        Devuelve el ajuste aplicado para Stripe (puede ser 0, + o -).
+        Devuelve el ajuste aplicado para Stripe (puede ser 0 o negativo).
         """
         return self.total_para_stripe() - int(self.total)
 
@@ -420,9 +422,9 @@ class ItemCarrito(models.Model):
 
     def subtotal(self):
         """
-        Devuelve el subtotal del item (precio unitario * cantidad), en CLP.
+        Devuelve el subtotal del item (precio unitario * cantidad), en CLP como Decimal.
         """
-        return int(Decimal(self.cantidad) * Decimal(self.precio_unitario))
+        return Decimal(self.cantidad) * Decimal(self.precio_unitario)
 
 # --------------------------
 # PEDIDO Y TRACKING
@@ -523,7 +525,10 @@ class ItemPedido(models.Model):
         verbose_name_plural = _("Items de pedido")
 
     def subtotal(self):
-        return int(Decimal(self.cantidad) * Decimal(self.precio_unitario))
+        """
+        Devuelve el subtotal del item (precio unitario * cantidad), en CLP como Decimal.
+        """
+        return Decimal(self.cantidad) * Decimal(self.precio_unitario)
 
 # --------------------------
 # PAGO
@@ -552,6 +557,18 @@ class Pago(models.Model):
     class Meta:
         verbose_name = _("Pago")
         verbose_name_plural = _("Pagos")
+
+    def clean(self):
+        """
+        Valida que el monto del pago coincida con el total del pedido (o el total ajustado para Stripe).
+        """
+        if self.pedido and self.monto > 0:
+            total_pedido = int(self.pedido.total)
+            total_stripe = int(self.pedido.total // 50) * 50
+            if int(self.monto) not in [total_pedido, total_stripe]:
+                raise ValidationError(
+                    _("El monto del pago debe coincidir con el total del pedido o el total ajustado para Stripe.")
+                )
 
     def __str__(self):
         return f"Pago {self.stripe_id} - {self.estado}"
