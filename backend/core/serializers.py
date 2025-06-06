@@ -8,3 +8,6 @@ class ProductoSerializer(serializers.ModelSerializer):
         fields = [
             "id", "nombre", "marca", "valor", "imagen_principal", "categoria", "disponible"
         ]
+
+
+# Hay que pasar los serializers de views aca y acomodar views importando este archivo
