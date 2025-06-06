@@ -1,6 +1,6 @@
 import os
 import random
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from django.db import models
 from django.conf import settings
 from django.core.validators import MinValueValidator
@@ -9,6 +9,8 @@ from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
+from django.core.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _
 
 # --------------------------
 # ROLES DE USUARIO
@@ -19,13 +21,20 @@ class Rol(models.Model):
     Define los roles del sistema: Cliente, Administrador, Vendedor, Bodeguero, Contador.
     """
     ROL_CHOICES = [
-        ("CLIENTE", "Cliente"),
-        ("ADMINISTRADOR", "Administrador"),
-        ("VENDEDOR", "Vendedor"),
-        ("BODEGUERO", "Bodeguero"),
-        ("CONTADOR", "Contador"),
+        ("CLIENTE", _("Cliente")),
+        ("ADMINISTRADOR", _("Administrador")),
+        ("VENDEDOR", _("Vendedor")),
+        ("BODEGUERO", _("Bodeguero")),
+        ("CONTADOR", _("Contador")),
     ]
-    nombre = models.CharField(max_length=20, choices=ROL_CHOICES, unique=True)
+    nombre = models.CharField(
+        max_length=20, choices=ROL_CHOICES, unique=True,
+        verbose_name=_("Rol"), help_text=_("Rol del usuario en el sistema")
+    )
+
+    class Meta:
+        verbose_name = _("Rol")
+        verbose_name_plural = _("Roles")
 
     def __str__(self):
         return self.get_nombre_display()
@@ -38,10 +47,14 @@ class Sucursal(models.Model):
     """
     Representa una sucursal física de la empresa.
     """
-    nombre = models.CharField(max_length=100)
-    direccion = models.TextField()
-    latitud = models.FloatField(blank=True, null=True)
-    longitud = models.FloatField(blank=True, null=True)
+    nombre = models.CharField(max_length=100, verbose_name=_("Nombre"))
+    direccion = models.TextField(verbose_name=_("Dirección"))
+    latitud = models.FloatField(blank=True, null=True, verbose_name=_("Latitud"))
+    longitud = models.FloatField(blank=True, null=True, verbose_name=_("Longitud"))
+
+    class Meta:
+        verbose_name = _("Sucursal")
+        verbose_name_plural = _("Sucursales")
 
     def __str__(self):
         return self.nombre
@@ -50,22 +63,33 @@ class Sucursal(models.Model):
 # MARCA Y CATEGORÍA
 # --------------------------
 
-class Marca(models.Model):
-    """
-    Marca de un producto.
-    """
-    nombre = models.CharField(max_length=100, unique=True)
-    categorias = models.ManyToManyField('Categoria', blank=True, related_name='marcas')
-
-    def __str__(self):
-        return self.nombre
-
 class Categoria(models.Model):
     """
     Categoría de un producto.
     """
-    nombre = models.CharField(max_length=100, unique=True)
-    descripcion = models.TextField(blank=True, null=True)
+    nombre = models.CharField(max_length=100, unique=True, verbose_name=_("Nombre"))
+    descripcion = models.TextField(blank=True, null=True, verbose_name=_("Descripción"))
+
+    class Meta:
+        verbose_name = _("Categoría")
+        verbose_name_plural = _("Categorías")
+
+    def __str__(self):
+        return self.nombre
+
+class Marca(models.Model):
+    """
+    Marca de un producto. Puede estar asociada a varias categorías.
+    """
+    nombre = models.CharField(max_length=100, unique=True, verbose_name=_("Nombre"))
+    categorias = models.ManyToManyField(
+        Categoria, blank=True, related_name='marcas',
+        verbose_name=_("Categorías"), help_text=_("Categorías asociadas a la marca")
+    )
+
+    class Meta:
+        verbose_name = _("Marca")
+        verbose_name_plural = _("Marcas")
 
     def __str__(self):
         return self.nombre
@@ -79,14 +103,17 @@ class UserProfile(models.Model):
     Perfil extendido de usuario, con rol y sucursal (si aplica).
     """
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
-    rol = models.ForeignKey(Rol, on_delete=models.SET_NULL, null=True)
-    sucursal = models.ForeignKey(Sucursal, on_delete=models.SET_NULL, null=True, blank=True)
+    rol = models.ForeignKey(Rol, on_delete=models.SET_NULL, null=True, verbose_name=_("Rol"))
+    sucursal = models.ForeignKey(Sucursal, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Sucursal"))
     profile_picture = models.ImageField(
-        upload_to="profile_pictures/", blank=True, null=True
+        upload_to="profile_pictures/", blank=True, null=True, verbose_name=_("Foto de perfil")
     )
-    # Para clientes: preferencias de notificación
-    recibe_ofertas = models.BooleanField(default=True)
-    recibe_notificaciones = models.BooleanField(default=True)
+    recibe_ofertas = models.BooleanField(default=True, verbose_name=_("Recibe ofertas"))
+    recibe_notificaciones = models.BooleanField(default=True, verbose_name=_("Recibe notificaciones"))
+
+    class Meta:
+        verbose_name = _("Perfil de usuario")
+        verbose_name_plural = _("Perfiles de usuario")
 
     def __str__(self):
         return f"Perfil de {self.user.username} ({self.rol})"
@@ -95,28 +122,49 @@ class UserProfile(models.Model):
         default_address = self.user.addresses.filter(is_default=True).first()
         if default_address:
             return f"{default_address.address}"
-        return "Sin dirección predeterminada"
+        return _("Sin dirección predeterminada")
 
+# Señal robusta para crear/guardar UserProfile automáticamente
 @receiver(post_save, sender=User)
-def create_user_profile(sender, instance, created, **kwargs):
-    """Crea un UserProfile automáticamente cuando se crea un User."""
+def user_profile_post_save(sender, instance, created, **kwargs):
+    """
+    Crea o guarda el UserProfile automáticamente cuando se crea o guarda un User.
+    """
     if created:
         UserProfile.objects.create(user=instance)
-
-@receiver(post_save, sender=User)
-def save_user_profile(sender, instance, **kwargs):
-    """Guarda el UserProfile automáticamente cuando se guarda un User."""
-    instance.profile.save()
+    else:
+        if hasattr(instance, "profile"):
+            instance.profile.save()
 
 class Address(models.Model):
     """
     Dirección de usuario (puede ser de envío o facturación).
+    Solo una dirección por usuario puede tener is_default=True.
     """
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="addresses")
-    address = models.TextField()
-    latitude = models.FloatField(blank=True, null=True)
-    longitude = models.FloatField(blank=True, null=True)
-    is_default = models.BooleanField(default=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="addresses", verbose_name=_("Usuario"))
+    address = models.TextField(verbose_name=_("Dirección"))
+    latitude = models.FloatField(blank=True, null=True, verbose_name=_("Latitud"))
+    longitude = models.FloatField(blank=True, null=True, verbose_name=_("Longitud"))
+    is_default = models.BooleanField(default=False, verbose_name=_("¿Es predeterminada?"))
+
+    class Meta:
+        verbose_name = _("Dirección")
+        verbose_name_plural = _("Direcciones")
+
+    def clean(self):
+        # Garantiza que solo una dirección por usuario sea default
+        if self.is_default:
+            qs = Address.objects.filter(user=self.user, is_default=True)
+            if self.pk:
+                qs = qs.exclude(pk=self.pk)
+            if qs.exists():
+                raise ValidationError(_("Solo puede haber una dirección predeterminada por usuario."))
+
+    def save(self, *args, **kwargs):
+        # Si esta dirección es default, desmarca las demás
+        if self.is_default:
+            Address.objects.filter(user=self.user, is_default=True).exclude(pk=self.pk).update(is_default=False)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Address for {self.user.username}: {self.address}"
@@ -129,9 +177,13 @@ class Cliente(models.Model):
     """
     Modelo específico para clientes, con historial de compras y preferencias.
     """
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="cliente")
-    email = models.EmailField(unique=True)
-    fecha_registro = models.DateTimeField(auto_now_add=True)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="cliente", verbose_name=_("Usuario"))
+    email = models.EmailField(unique=True, verbose_name=_("Correo electrónico"))
+    fecha_registro = models.DateTimeField(auto_now_add=True, verbose_name=_("Fecha de registro"))
+
+    class Meta:
+        verbose_name = _("Cliente")
+        verbose_name_plural = _("Clientes")
 
     def historial_compras(self):
         return Pedido.objects.filter(cliente=self)
@@ -149,11 +201,16 @@ def generar_nro_referencia_unico():
         if not Producto.objects.filter(nro_referencia=nro_referencia).exists():
             return nro_referencia
 
-def upload_to(instance, filename):
+def upload_to_producto(instance, filename):
+    # Unifica la lógica de rutas para imágenes de productos
     return os.path.join("productos", instance.marca.nombre, instance.nombre, filename)
 
 class ImagenProducto(models.Model):
-    imagen = models.ImageField(upload_to="productos/secundarias/")
+    imagen = models.ImageField(upload_to="productos/secundarias/", verbose_name=_("Imagen secundaria"))
+
+    class Meta:
+        verbose_name = _("Imagen de producto")
+        verbose_name_plural = _("Imágenes de producto")
 
     def __str__(self):
         return f"Imagen ID: {self.id}"
@@ -161,28 +218,35 @@ class ImagenProducto(models.Model):
 class Producto(models.Model):
     """
     Producto del catálogo, asociado a marca, categoría y sucursal.
+    El precio 'valor' es el valor final en CLP (IVA incluido).
     """
-    nombre = models.CharField(max_length=200)
-    descripcion = models.TextField(blank=True, null=True)
-    marca = models.ForeignKey(Marca, on_delete=models.PROTECT, related_name="productos")
-    categoria = models.ForeignKey(Categoria, on_delete=models.PROTECT, related_name="productos")
-    sucursal = models.ForeignKey(Sucursal, on_delete=models.SET_NULL, null=True, blank=True, related_name="productos")
+    nombre = models.CharField(max_length=200, verbose_name=_("Nombre"))
+    descripcion = models.TextField(blank=True, null=True, verbose_name=_("Descripción"))
+    marca = models.ForeignKey(Marca, on_delete=models.PROTECT, related_name="productos", verbose_name=_("Marca"))
+    categoria = models.ForeignKey(Categoria, on_delete=models.PROTECT, related_name="productos", verbose_name=_("Categoría"))
+    sucursal = models.ForeignKey(Sucursal, on_delete=models.SET_NULL, null=True, blank=True, related_name="productos", verbose_name=_("Sucursal"))
     nro_referencia = models.CharField(
-        max_length=6, unique=True, default=generar_nro_referencia_unico, editable=False
+        max_length=6, unique=True, default=generar_nro_referencia_unico, editable=False, verbose_name=_("N° Referencia")
     )
     valor = models.DecimalField(
-        max_digits=10, decimal_places=2, validators=[MinValueValidator(0.01)]
+        max_digits=10, decimal_places=0, validators=[MinValueValidator(1)],
+        verbose_name=_("Precio (CLP, IVA incluido)"),
+        help_text=_("Precio final en CLP, con IVA incluido")
     )
-    stock = models.PositiveIntegerField(default=0)
-    disponible = models.BooleanField(default=True, editable=False)
+    stock = models.PositiveIntegerField(default=0, verbose_name=_("Stock"))
+    disponible = models.BooleanField(default=True, editable=False, verbose_name=_("¿Disponible?"))
     imagen_principal = models.ImageField(
-        upload_to=upload_to, blank=True, null=True, verbose_name="Imagen principal"
+        upload_to=upload_to_producto, blank=True, null=True, verbose_name=_("Imagen principal")
     )
     imagenes_secundarias = models.ManyToManyField(
-        ImagenProducto, blank=True, related_name="productos"
+        ImagenProducto, blank=True, related_name="productos", verbose_name=_("Imágenes secundarias")
     )
-    fecha_creacion = models.DateTimeField(auto_now_add=True)
-    fecha_actualizacion = models.DateTimeField(auto_now=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True, verbose_name=_("Fecha de creación"))
+    fecha_actualizacion = models.DateTimeField(auto_now=True, verbose_name=_("Fecha de actualización"))
+
+    class Meta:
+        verbose_name = _("Producto")
+        verbose_name_plural = _("Productos")
 
     def save(self, *args, **kwargs):
         self.disponible = self.stock > 0
@@ -213,11 +277,15 @@ class ValoracionProducto(models.Model):
     """
     Valoración y comentario de un producto por parte de un cliente.
     """
-    producto = models.ForeignKey(Producto, on_delete=models.CASCADE, related_name="valoraciones")
-    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name="valoraciones")
-    puntaje = models.PositiveSmallIntegerField(default=5)
-    comentario = models.TextField(blank=True, null=True)
-    fecha = models.DateTimeField(auto_now_add=True)
+    producto = models.ForeignKey(Producto, on_delete=models.CASCADE, related_name="valoraciones", verbose_name=_("Producto"))
+    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name="valoraciones", verbose_name=_("Cliente"))
+    puntaje = models.PositiveSmallIntegerField(default=5, verbose_name=_("Puntaje"))
+    comentario = models.TextField(blank=True, null=True, verbose_name=_("Comentario"))
+    fecha = models.DateTimeField(auto_now_add=True, verbose_name=_("Fecha"))
+
+    class Meta:
+        verbose_name = _("Valoración de producto")
+        verbose_name_plural = _("Valoraciones de producto")
 
     def __str__(self):
         return f"{self.producto} - {self.puntaje} estrellas"
@@ -229,88 +297,132 @@ class ValoracionProducto(models.Model):
 class Cart(models.Model):
     """
     Carrito de compras asociado a un cliente.
+    Todos los montos son en CLP (sin decimales). El precio de cada producto ya incluye IVA.
+    El desglose para boleta se calcula como:
+      - total = suma de valores de productos (con IVA)
+      - iva = round(total * 19 / 119)
+      - subtotal = total - iva
     """
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="carts")
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="carts", verbose_name=_("Usuario"))
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("Creado el"))
+    updated_at = models.DateTimeField(auto_now=True, verbose_name=_("Actualizado el"))
     estado = models.CharField(
         max_length=20,
         choices=[
-            ("ACTIVO", "Activo"),
-            ("PAGADO", "Pagado"),
-            ("EN_PROCESO", "En proceso"),
-            ("ENVIADO", "Enviado"),
-            ("ENTREGADO", "Entregado"),
-            ("CANCELADO", "Cancelado"),
+            ("ACTIVO", _("Activo")),
+            ("PAGADO", _("Pagado")),
+            ("EN_PROCESO", _("En proceso")),
+            ("ENVIADO", _("Enviado")),
+            ("ENTREGADO", _("Entregado")),
+            ("CANCELADO", _("Cancelado")),
         ],
         default="ACTIVO",
-    )
-    subtotal = models.DecimalField(
-        max_digits=12, decimal_places=0, default=0, validators=[MinValueValidator(0)]
-    )
-    iva = models.DecimalField(
-        max_digits=12, decimal_places=0, default=0, validators=[MinValueValidator(0)]
-    )
-    total = models.DecimalField(
-        max_digits=12, decimal_places=0, default=0, validators=[MinValueValidator(0)]
+        verbose_name=_("Estado")
     )
     metodo_despacho = models.CharField(
         max_length=20,
         choices=[
-            ("RETIRO_TIENDA", "Retiro en tienda"),
-            ("DESPACHO_DOMICILIO", "Despacho a domicilio"),
+            ("RETIRO_TIENDA", _("Retiro en tienda")),
+            ("DESPACHO_DOMICILIO", _("Despacho a domicilio")),
         ],
         null=True,
         blank=True,
+        verbose_name=_("Método de despacho")
     )
     direccion_envio = models.ForeignKey(
-        Address, on_delete=models.SET_NULL, null=True, blank=True
+        Address, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Dirección de envío")
     )
     costo_despacho = models.DecimalField(
         max_digits=10,
         decimal_places=0,
         default=0,
         validators=[MinValueValidator(0)],
+        verbose_name=_("Costo de despacho (CLP)")
     )
+    subtotal = models.DecimalField(
+        max_digits=12, decimal_places=0, default=0, validators=[MinValueValidator(0)],
+        verbose_name=_("Subtotal (CLP, sin IVA)")
+    )
+    iva = models.DecimalField(
+        max_digits=12, decimal_places=0, default=0, validators=[MinValueValidator(0)],
+        verbose_name=_("IVA (CLP)")
+    )
+    total = models.DecimalField(
+        max_digits=12, decimal_places=0, default=0, validators=[MinValueValidator(0)],
+        verbose_name=_("Total (CLP, con IVA)")
+    )
+
+    class Meta:
+        verbose_name = _("Carrito")
+        verbose_name_plural = _("Carritos")
+
+    def clean(self):
+        # Validación de coherencia de totales
+        if self.total < 0 or self.subtotal < 0 or self.iva < 0:
+            raise ValidationError(_("Los montos no pueden ser negativos."))
+        if self.subtotal + self.iva != self.total:
+            raise ValidationError(_("El subtotal más el IVA debe ser igual al total."))
+
+    def calcular_totales(self):
+        """
+        Calcula subtotal, IVA y total del carrito según normativa chilena.
+        Todos los valores son en CLP (sin decimales).
+        El precio de cada producto ya incluye IVA.
+        """
+        items = self.items.all()
+        total = sum(item.subtotal() for item in items)
+        iva = Decimal(total * 19 / 119).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+        subtotal = total - iva
+        if self.metodo_despacho == "DESPACHO_DOMICILIO":
+            costo_despacho = Decimal(self.costo_despacho or 0)
+            total_final = total + costo_despacho
+        else:
+            costo_despacho = Decimal(0)
+            total_final = total
+        self.subtotal = subtotal
+        self.iva = iva
+        self.total = total_final
+        # No llamar a self.save() aquí para evitar recursión accidental
+
+    def total_para_stripe(self):
+        """
+        Devuelve el total ajustado al múltiplo de 50 más cercano (requerido por Stripe CLP).
+        """
+        return int(Decimal(self.total).quantize(Decimal('1'), rounding=ROUND_HALF_UP) / 50) * 50
+
+    def ajuste_stripe(self):
+        """
+        Devuelve el ajuste aplicado para Stripe (puede ser 0, + o -).
+        """
+        return self.total_para_stripe() - int(self.total)
 
     def __str__(self):
         return f"Cart #{self.id} - {self.user.username} ({self.estado})"
 
-    def calcular_totales(self):
-        items = self.items.all()
-        self.subtotal = sum(item.subtotal() for item in items)
-        self.iva = int(round(self.subtotal * 0.19))
-        if self.metodo_despacho == "DESPACHO_DOMICILIO":
-            self.costo_despacho = int(self.costo_despacho or 0)
-            self.total = self.subtotal + self.iva + self.costo_despacho
-        else:
-            self.costo_despacho = 0
-            self.total = self.subtotal + self.iva
-        self.save()
-
-    def total_para_stripe(self):
-        """Devuelve el total ajustado al múltiplo de 50 más cercano (requerido por Stripe CLP)"""
-        return int(round(self.total / 50.0) * 50)
-
-    def ajuste_stripe(self):
-        """Devuelve el ajuste aplicado para Stripe (puede ser 0, + o -)"""
-        return self.total_para_stripe() - int(self.total)
-
 class ItemCarrito(models.Model):
     """
     Item dentro del carrito de compras.
+    El precio unitario es el valor final del producto (con IVA, en CLP).
     """
-    carrito = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name="items")
+    carrito = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name="items", verbose_name=_("Carrito"))
     producto = models.ForeignKey(
-        Producto, on_delete=models.CASCADE, related_name="items_carrito"
+        Producto, on_delete=models.CASCADE, related_name="items_carrito", verbose_name=_("Producto")
     )
-    cantidad = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)])
+    cantidad = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)], verbose_name=_("Cantidad"))
     precio_unitario = models.DecimalField(
-        max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))]
+        max_digits=10, decimal_places=0, validators=[MinValueValidator(1)],
+        verbose_name=_("Precio unitario (CLP, con IVA)")
     )
 
+    class Meta:
+        verbose_name = _("Item de carrito")
+        verbose_name_plural = _("Items de carrito")
+
     def subtotal(self):
-        return int(round(self.cantidad * float(self.precio_unitario)))
+        """
+        Devuelve el subtotal del item (precio unitario * cantidad), en CLP.
+        """
+        return int(Decimal(self.cantidad) * Decimal(self.precio_unitario))
 
 # --------------------------
 # PEDIDO Y TRACKING
@@ -321,35 +433,41 @@ class Pedido(models.Model):
     Pedido realizado por un cliente. Incluye tracking de estado y asignación de bodeguero.
     """
     ESTADO_CHOICES = [
-        ("SOLICITADO", "Solicitado"),
-        ("PREPARACION", "En preparación"),
-        ("LISTO_RETIRO", "Listo para retiro"),
-        ("ENVIADO", "Enviado"),
-        ("ENTREGADO", "Entregado"),
-        ("CANCELADO", "Cancelado"),
+        ("SOLICITADO", _("Solicitado")),
+        ("PREPARACION", _("En preparación")),
+        ("LISTO_RETIRO", _("Listo para retiro")),
+        ("ENVIADO", _("Enviado")),
+        ("ENTREGADO", _("Entregado")),
+        ("CANCELADO", _("Cancelado")),
     ]
-    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name="pedidos")
-    carrito = models.OneToOneField(Cart, on_delete=models.SET_NULL, null=True, blank=True)
-    fecha_creacion = models.DateTimeField(auto_now_add=True)
-    fecha_actualizacion = models.DateTimeField(auto_now=True)
-    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default="SOLICITADO")
-    productos = models.ManyToManyField(Producto, through="ItemPedido")
+    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name="pedidos", verbose_name=_("Cliente"))
+    carrito = models.OneToOneField(Cart, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Carrito"))
+    fecha_creacion = models.DateTimeField(auto_now_add=True, verbose_name=_("Fecha de creación"))
+    fecha_actualizacion = models.DateTimeField(auto_now=True, verbose_name=_("Fecha de actualización"))
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default="SOLICITADO", verbose_name=_("Estado"))
+    productos = models.ManyToManyField(Producto, through="ItemPedido", verbose_name=_("Productos"))
     metodo_retiro = models.CharField(
         max_length=20,
         choices=[
-            ("RETIRO_TIENDA", "Retiro en tienda"),
-            ("DESPACHO_DOMICILIO", "Despacho a domicilio"),
+            ("RETIRO_TIENDA", _("Retiro en tienda")),
+            ("DESPACHO_DOMICILIO", _("Despacho a domicilio")),
         ],
         default="RETIRO_TIENDA",
+        verbose_name=_("Método de retiro")
     )
-    direccion_envio = models.ForeignKey(Address, on_delete=models.SET_NULL, null=True, blank=True)
+    direccion_envio = models.ForeignKey(Address, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Dirección de envío"))
     bodeguero_asignado = models.ForeignKey(
-        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="pedidos_asignados"
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="pedidos_asignados", verbose_name=_("Bodeguero asignado")
     )
-    historial_estados = models.JSONField(default=list, blank=True)
-    total = models.DecimalField(max_digits=12, decimal_places=0, default=0)
-    # Auditoría
-    actualizado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="pedidos_actualizados")
+    historial_estados = models.JSONField(default=list, blank=True, verbose_name=_("Historial de estados"))
+    total = models.DecimalField(max_digits=12, decimal_places=0, default=0, verbose_name=_("Total (CLP, con IVA)"))
+    actualizado_por = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="pedidos_actualizados", verbose_name=_("Actualizado por")
+    )
+
+    class Meta:
+        verbose_name = _("Pedido")
+        verbose_name_plural = _("Pedidos")
 
     def actualizar_estado(self, nuevo_estado, usuario):
         """
@@ -395,13 +513,17 @@ class ItemPedido(models.Model):
     """
     Relación producto-cantidad dentro de un pedido.
     """
-    pedido = models.ForeignKey(Pedido, on_delete=models.CASCADE, related_name="items")
-    producto = models.ForeignKey(Producto, on_delete=models.PROTECT)
-    cantidad = models.PositiveIntegerField(default=1)
-    precio_unitario = models.DecimalField(max_digits=10, decimal_places=2)
+    pedido = models.ForeignKey(Pedido, on_delete=models.CASCADE, related_name="items", verbose_name=_("Pedido"))
+    producto = models.ForeignKey(Producto, on_delete=models.PROTECT, verbose_name=_("Producto"))
+    cantidad = models.PositiveIntegerField(default=1, verbose_name=_("Cantidad"))
+    precio_unitario = models.DecimalField(max_digits=10, decimal_places=0, verbose_name=_("Precio unitario (CLP, con IVA)"))
+
+    class Meta:
+        verbose_name = _("Item de pedido")
+        verbose_name_plural = _("Items de pedido")
 
     def subtotal(self):
-        return self.cantidad * self.precio_unitario
+        return int(Decimal(self.cantidad) * Decimal(self.precio_unitario))
 
 # --------------------------
 # PAGO
@@ -411,20 +533,25 @@ class Pago(models.Model):
     """
     Registro de pagos procesados (Stripe).
     """
-    pedido = models.OneToOneField(Pedido, on_delete=models.CASCADE, related_name="pago")
-    stripe_id = models.CharField(max_length=100, unique=True)
+    pedido = models.OneToOneField(Pedido, on_delete=models.CASCADE, related_name="pago", verbose_name=_("Pedido"))
+    stripe_id = models.CharField(max_length=100, unique=True, verbose_name=_("ID de Stripe"))
     estado = models.CharField(
         max_length=20,
         choices=[
-            ("PENDIENTE", "Pendiente"),
-            ("COMPLETADO", "Completado"),
-            ("FALLIDO", "Fallido"),
+            ("PENDIENTE", _("Pendiente")),
+            ("COMPLETADO", _("Completado")),
+            ("FALLIDO", _("Fallido")),
         ],
         default="PENDIENTE",
+        verbose_name=_("Estado")
     )
-    metodo = models.CharField(max_length=50, default="Stripe")
-    fecha_pago = models.DateTimeField(auto_now_add=True)
-    monto = models.DecimalField(max_digits=12, decimal_places=0)
+    metodo = models.CharField(max_length=50, default="Stripe", verbose_name=_("Método de pago"))
+    fecha_pago = models.DateTimeField(auto_now_add=True, verbose_name=_("Fecha de pago"))
+    monto = models.DecimalField(max_digits=12, decimal_places=0, verbose_name=_("Monto (CLP)"))
+
+    class Meta:
+        verbose_name = _("Pago")
+        verbose_name_plural = _("Pagos")
 
     def __str__(self):
         return f"Pago {self.stripe_id} - {self.estado}"
@@ -437,11 +564,15 @@ class Bodeguero(models.Model):
     """
     Perfil extendido para bodeguero, con tracking de turnos.
     """
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="bodeguero")
-    en_turno = models.BooleanField(default=False)
-    hora_entrada = models.DateTimeField(null=True, blank=True)
-    hora_salida = models.DateTimeField(null=True, blank=True)
-    comprobante_entrada = models.FileField(upload_to="comprobantes_bodeguero/", blank=True, null=True)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="bodeguero", verbose_name=_("Usuario"))
+    en_turno = models.BooleanField(default=False, verbose_name=_("¿En turno?"))
+    hora_entrada = models.DateTimeField(null=True, blank=True, verbose_name=_("Hora de entrada"))
+    hora_salida = models.DateTimeField(null=True, blank=True, verbose_name=_("Hora de salida"))
+    comprobante_entrada = models.FileField(upload_to="comprobantes_bodeguero/", blank=True, null=True, verbose_name=_("Comprobante de entrada"))
+
+    class Meta:
+        verbose_name = _("Bodeguero")
+        verbose_name_plural = _("Bodegueros")
 
     def marcar_entrada(self, comprobante=None):
         from django.utils import timezone
@@ -464,19 +595,23 @@ class Bodeguero(models.Model):
     def __str__(self):
         return f"Bodeguero: {self.user.username} ({'En turno' if self.en_turno else 'Fuera de turno'})"
 
-# Vendedor y Contador pueden tener modelos similares si se requiere lógica adicional
-
 class Vendedor(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="vendedor")
-    sucursal = models.ForeignKey(Sucursal, on_delete=models.SET_NULL, null=True, blank=True)
-    # Agregar campos adicionales según necesidades
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="vendedor", verbose_name=_("Usuario"))
+    sucursal = models.ForeignKey(Sucursal, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Sucursal"))
+
+    class Meta:
+        verbose_name = _("Vendedor")
+        verbose_name_plural = _("Vendedores")
 
     def __str__(self):
         return f"Vendedor: {self.user.username}"
 
 class Contador(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="contador")
-    # Agregar campos adicionales según necesidades
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="contador", verbose_name=_("Usuario"))
+
+    class Meta:
+        verbose_name = _("Contador")
+        verbose_name_plural = _("Contadores")
 
     def __str__(self):
         return f"Contador: {self.user.username}"
@@ -486,14 +621,21 @@ class Contador(models.Model):
 # --------------------------
 
 class AuditoriaCambio(models.Model):
-    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-    objeto_id = models.PositiveIntegerField()
+    """
+    Registro de cambios relevantes en modelos críticos.
+    """
+    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name=_("Usuario"))
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, verbose_name=_("Tipo de contenido"))
+    objeto_id = models.PositiveIntegerField(verbose_name=_("ID del objeto"))
     content_object = GenericForeignKey('content_type', 'objeto_id')
-    campo = models.CharField(max_length=100)
-    valor_anterior = models.TextField(blank=True, null=True)
-    valor_nuevo = models.TextField(blank=True, null=True)
-    fecha = models.DateTimeField(auto_now_add=True)
+    campo = models.CharField(max_length=100, verbose_name=_("Campo"))
+    valor_anterior = models.TextField(blank=True, null=True, verbose_name=_("Valor anterior"))
+    valor_nuevo = models.TextField(blank=True, null=True, verbose_name=_("Valor nuevo"))
+    fecha = models.DateTimeField(auto_now_add=True, verbose_name=_("Fecha"))
+
+    class Meta:
+        verbose_name = _("Auditoría de cambio")
+        verbose_name_plural = _("Auditorías de cambio")
 
     def __str__(self):
         return f"Auditoría: {self.content_type} ({self.campo}) por {self.usuario}"
@@ -515,7 +657,7 @@ def enviar_oferta_especial(cliente, pedido):
     print(f"[EMAIL] Oferta especial enviada a {cliente.email} por compra de más de 4 productos en Pedido #{pedido.id}")
 
 # --------------------------
-# SIGNAL 1: Auditoría de cambios de estado en Pedido
+# SIGNALS
 # --------------------------
 
 @receiver(pre_save, sender=Pedido)
@@ -532,16 +674,12 @@ def auditar_cambio_estado_pedido(sender, instance, **kwargs):
     if pedido_anterior.estado != instance.estado:
         AuditoriaCambio.objects.create(
             usuario=instance.actualizado_por,
-            modelo="Pedido",
+            content_type=ContentType.objects.get_for_model(Pedido),
             objeto_id=instance.pk,
             campo="estado",
             valor_anterior=pedido_anterior.estado,
             valor_nuevo=instance.estado,
         )
-
-# --------------------------
-# SIGNAL 2: Email de bienvenida al crear Cliente
-# --------------------------
 
 @receiver(post_save, sender=Cliente)
 def enviar_bienvenida_cliente(sender, instance, created, **kwargs):
@@ -551,22 +689,13 @@ def enviar_bienvenida_cliente(sender, instance, created, **kwargs):
     if created:
         enviar_email_bienvenida(instance)
 
-# --------------------------
-# SIGNAL 3: Email de confirmación cuando Bodeguero marca entrada a turno
-# --------------------------
-
 @receiver(post_save, sender=Bodeguero)
 def email_confirmacion_entrada_turno(sender, instance, **kwargs):
     """
     Envía email de confirmación cuando un Bodeguero marca entrada a turno.
     """
     if instance.en_turno and instance.hora_entrada and instance.comprobante_entrada:
-        # Solo si está en turno y tiene comprobante
         enviar_email_confirmacion_turno(instance)
-
-# --------------------------
-# SIGNAL 4: Recalcular promedio de valoraciones al agregar una nueva
-# --------------------------
 
 @receiver(post_save, sender=ValoracionProducto)
 def recalcular_promedio_valoracion(sender, instance, created, **kwargs):
@@ -578,14 +707,7 @@ def recalcular_promedio_valoracion(sender, instance, created, **kwargs):
         valoraciones = producto.valoraciones.all()
         if valoraciones.exists():
             promedio = round(sum([v.puntaje for v in valoraciones]) / valoraciones.count(), 2)
-            # Si quieres guardar el promedio en el modelo Producto, agrega un campo y actualízalo aquí.
-            # producto.promedio_valoracion = promedio
-            # producto.save()
             print(f"[INFO] Promedio de valoraciones actualizado para {producto}: {promedio}")
-
-# --------------------------
-# SIGNAL 5: Cuando un Pago es confirmado, actualizar Pedido y notificar Cliente
-# --------------------------
 
 @receiver(post_save, sender=Pago)
 def pago_confirmado_actualiza_pedido(sender, instance, **kwargs):
@@ -599,10 +721,6 @@ def pago_confirmado_actualiza_pedido(sender, instance, **kwargs):
         pedido.actualizar_estado("PREPARACION", pedido.cliente.user)
         enviar_email_pago_confirmado(pedido.cliente, pedido)
 
-# --------------------------
-# SIGNAL 6 (Opcional): Oferta especial por compra de más de 4 productos
-# --------------------------
-
 @receiver(post_save, sender=Pedido)
 def oferta_especial_por_compra(sender, instance, created, **kwargs):
     """
@@ -612,6 +730,3 @@ def oferta_especial_por_compra(sender, instance, created, **kwargs):
         total_productos = sum([item.cantidad for item in instance.items.all()])
         if total_productos > 4:
             enviar_oferta_especial(instance.cliente, instance)
-
-# NOTA: Para integración con DRF, todos los modelos están preparados para ser serializados fácilmente.
-# Se recomienda crear signals para auditoría y lógica de negocio adicional según necesidades.
