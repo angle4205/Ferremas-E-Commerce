@@ -7,11 +7,16 @@ from rest_framework.response import Response
 from rest_framework import status, permissions
 from rest_framework.generics import get_object_or_404
 from rest_framework.pagination import PageNumberPagination
-from .models import Producto, UserProfile, Pedido, ItemPedido
-from .serializers import ProductoSerializer
+from .models import Producto, UserProfile, Pedido, ItemPedido, Categoria
+from .serializers import (
+    ProductoSerializer,
+    ProductoEnItemPedidoSerializer,
+    ItemPedidoSerializer,
+    PedidoSimpleSerializer,
+    UserProfileSerializer,
+)
 from django.utils import timezone
 from django.db import models
-from rest_framework import serializers
 
 # --- Vistas de navegación ---
 
@@ -54,44 +59,6 @@ class IsAdminEmpleado(permissions.BasePermission):
     """Permite acceso solo a empleados con rol ADMINISTRADOR."""
     def has_permission(self, request, view):
         return hasattr(request.user, "profile") and getattr(request.user.profile.rol, "nombre", None) == "ADMINISTRADOR"
-
-# --- Serializers mejorados ---
-
-class ProductoEnItemPedidoSerializer(serializers.ModelSerializer):
-    marca = serializers.StringRelatedField()
-    categoria = serializers.StringRelatedField()
-    class Meta:
-        model = Producto
-        fields = ["id", "nombre", "marca", "categoria", "valor"]
-
-class ItemPedidoSerializer(serializers.ModelSerializer):
-    producto = ProductoEnItemPedidoSerializer()
-    class Meta:
-        model = ItemPedido
-        fields = ["id", "producto", "cantidad", "precio_unitario"]
-
-class PedidoSimpleSerializer(serializers.ModelSerializer):
-    items = ItemPedidoSerializer(many=True, read_only=True)
-    cliente = serializers.SerializerMethodField()
-    direccion_envio = serializers.StringRelatedField()
-    class Meta:
-        model = Pedido
-        fields = [
-            "id", "estado", "fecha_creacion", "fecha_actualizacion", "total",
-            "cliente", "items", "metodo_retiro", "direccion_envio"
-        ]
-    def get_cliente(self, obj):
-        return obj.cliente.user.username if obj.cliente and obj.cliente.user else None
-
-class UserProfileSerializer(serializers.ModelSerializer):
-    user = serializers.StringRelatedField()
-    rol = serializers.StringRelatedField()
-    sucursal = serializers.StringRelatedField()
-    class Meta:
-        model = UserProfile
-        fields = [
-            "id", "user", "rol", "tipo_empleado", "en_turno", "hora_entrada", "hora_salida", "sucursal", "profile_picture"
-        ]
 
 # --- Helpers privados y mixins ---
 
@@ -297,7 +264,20 @@ class AdminEmpleadoDetailAPIView(APIView):
         serializer = UserProfileSerializer(empleado)
         return _respuesta_ok({"empleado": serializer.data})
 
-# --- Rutas sugeridas para urls.py ---
+class CategoriaListAPIView(APIView):
+    def get(self, request):
+        categorias = Categoria.objects.all()
+        data = [
+            {
+                "id": cat.id,
+                "nombre": cat.nombre,
+                "descripcion": cat.descripcion
+            }
+            for cat in categorias
+        ]
+        return Response(data)
+
+# --- urls para las APIView ---
 # path('api/empleados/marcar_entrada/', MarcarEntradaAPIView.as_view()),
 # path('api/empleados/marcar_salida/', MarcarSalidaAPIView.as_view()),
 # path('api/empleados/perfil/', PerfilEmpleadoAPIView.as_view()),

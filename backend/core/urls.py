@@ -26,6 +26,7 @@ from .views import (
     ContadorReportesAPIView,
     AdminEmpleadosListAPIView,
     AdminEmpleadoDetailAPIView,
+    CategoriaListAPIView,
 )
 from django.conf import settings
 from django.conf.urls.static import static
@@ -38,6 +39,7 @@ urlpatterns = [
 
     # API Productos (visible para clientes y empleados)
     path('api/productos/', ProductoListAPIView.as_view(), name='productos-list'),
+    path("api/categorias/", CategoriaListAPIView.as_view()),
 
     # API Empleados - Turnos y perfil
     path('api/empleados/marcar_entrada/', MarcarEntradaAPIView.as_view(), name='empleado-marcar-entrada'),

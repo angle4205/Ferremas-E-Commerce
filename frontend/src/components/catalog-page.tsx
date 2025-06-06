@@ -1,5 +1,7 @@
 import React from "react";
-import { Card, CardBody, CardFooter, Button, Chip, Input, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Pagination, Breadcrumbs, BreadcrumbItem } from "@heroui/react";
+import {
+  Card, CardBody, CardFooter, Button, Chip, Input, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Pagination, Breadcrumbs, BreadcrumbItem
+} from "@heroui/react";
 import { Icon } from "@iconify/react";
 
 interface Producto {
@@ -7,12 +9,9 @@ interface Producto {
   nombre: string;
   marca: string;
   valor: number;
-  originalPrice?: number;
-  rating: number;
   imagen_principal: string;
-  isNew?: boolean;
-  isBestSeller?: boolean;
   categoria: string;
+  disponible: boolean;
 }
 
 interface EstadoFiltros {
@@ -40,14 +39,9 @@ const TarjetaProducto: React.FC<{ producto: Producto }> = ({ producto }) => (
           className="absolute top-0 left-0 w-full h-full object-contain"
           style={{ background: "#fff" }}
         />
-        {producto.isNew && (
-          <Chip color="primary" variant="flat" size="sm" className="absolute top-2 left-2 z-10">
-            Nuevo
-          </Chip>
-        )}
-        {producto.isBestSeller && (
-          <Chip color="warning" variant="flat" size="sm" className="absolute top-2 left-2 z-10">
-            Más vendido
+        {!producto.disponible && (
+          <Chip color="danger" size="sm" className="absolute top-2 left-2 z-10">
+            Sin stock
           </Chip>
         )}
       </div>
@@ -56,9 +50,6 @@ const TarjetaProducto: React.FC<{ producto: Producto }> = ({ producto }) => (
         <h3 className="font-medium text-foreground/90 line-clamp-1">{producto.nombre}</h3>
         <div className="flex items-center gap-2 mt-2">
           <span className="font-semibold">{formatoCLP(producto.valor)}</span>
-          {producto.originalPrice && (
-            <span className="text-default-500 text-sm line-through">{formatoCLP(producto.originalPrice)}</span>
-          )}
         </div>
       </div>
     </CardBody>
@@ -68,6 +59,7 @@ const TarjetaProducto: React.FC<{ producto: Producto }> = ({ producto }) => (
         color="primary"
         variant="flat"
         startContent={<Icon icon="lucide:shopping-cart" size={18} />}
+        disabled={!producto.disponible}
       >
         Agregar al carrito
       </Button>
@@ -99,45 +91,34 @@ export const CatalogPage: React.FC = () => {
             nombre: item.nombre,
             marca: item.marca,
             valor: Number(item.valor),
-            originalPrice: undefined,
-            rating: 4,
             imagen_principal: item.imagen_principal,
-            isNew: false,
-            isBestSeller: false,
             categoria: item.categoria,
+            disponible: !!item.disponible,
           }))
         );
         setCargando(false);
       });
   }, []);
 
-  // Opciones de categorías según tu modelo
-  const opcionesCategoria = [
-    { key: "todos", label: "Todas las categorías" },
-    { key: "HERRAMIENTAS_MANUALES", label: "Herramientas Manuales" },
-    { key: "HERRAMIENTAS_ELECTRICAS", label: "Herramientas Eléctricas" },
-    { key: "PINTURAS", label: "Pinturas" },
-    { key: "MATERIALES_ELECTRICOS", label: "Materiales Eléctricos" },
-    { key: "SEGURIDAD", label: "Artículos de Seguridad" },
-    { key: "FIJACION", label: "Artículos de Fijación" },
-    { key: "FERRETERIA", label: "Ferretería General" },
-    { key: "JARDIN", label: "Jardín y Exteriores" },
-  ];
+  // Extraer categorías únicas del catálogo para el filtro
+  const categoriasUnicas = React.useMemo(() => {
+    const cats = Array.from(new Set(productos.map(p => p.categoria).filter(Boolean)));
+    return [{ key: "todos", label: "Todas las categorías" }, ...cats.map(c => ({ key: c, label: c }))];
+  }, [productos]);
 
   const opcionesPrecio = [
     { key: "todos", label: "Todos los precios" },
-    { key: "menos25", label: "Menos de $25" },
-    { key: "25a50", label: "$25 - $50" },
-    { key: "50a100", label: "$50 - $100" },
-    { key: "mas100", label: "Más de $100" }
+    { key: "menos25", label: "Menos de $25.000" },
+    { key: "25a50", label: "$25.000 - $50.000" },
+    { key: "50a100", label: "$50.000 - $100.000" },
+    { key: "mas100", label: "Más de $100.000" }
   ];
 
   const opcionesOrden = [
     { key: "populares", label: "Más populares" },
     { key: "nuevos", label: "Más nuevos" },
     { key: "precioAsc", label: "Precio: menor a mayor" },
-    { key: "precioDesc", label: "Precio: mayor a menor" },
-    { key: "rating", label: "Mejor calificados" }
+    { key: "precioDesc", label: "Precio: mayor a menor" }
   ];
 
   const cambiarFiltro = (tipo: keyof EstadoFiltros, valor: string) => {
@@ -160,16 +141,16 @@ export const CatalogPage: React.FC = () => {
 
     switch (filtros.rangoPrecio) {
       case "menos25":
-        resultado = resultado.filter(p => p.valor < 25);
+        resultado = resultado.filter(p => p.valor < 25000);
         break;
       case "25a50":
-        resultado = resultado.filter(p => p.valor >= 25 && p.valor <= 50);
+        resultado = resultado.filter(p => p.valor >= 25000 && p.valor <= 50000);
         break;
       case "50a100":
-        resultado = resultado.filter(p => p.valor > 50 && p.valor <= 100);
+        resultado = resultado.filter(p => p.valor > 50000 && p.valor <= 100000);
         break;
       case "mas100":
-        resultado = resultado.filter(p => p.valor > 100);
+        resultado = resultado.filter(p => p.valor > 100000);
         break;
       default:
         break;
@@ -180,7 +161,8 @@ export const CatalogPage: React.FC = () => {
       resultado = resultado.filter(
         p =>
           p.nombre.toLowerCase().includes(q) ||
-          p.categoria.toLowerCase().includes(q)
+          p.categoria.toLowerCase().includes(q) ||
+          p.marca.toLowerCase().includes(q)
       );
     }
 
@@ -191,14 +173,12 @@ export const CatalogPage: React.FC = () => {
       case "precioDesc":
         resultado.sort((a, b) => b.valor - a.valor);
         break;
-      case "rating":
-        resultado.sort((a, b) => b.rating - a.rating);
-        break;
       case "nuevos":
         resultado.sort((a, b) => b.id - a.id);
         break;
       default:
-        resultado.sort((a, b) => b.rating - a.rating);
+        // popoulares: podrías implementar lógica de popularidad si la tienes
+        break;
     }
 
     return resultado;
@@ -211,7 +191,7 @@ export const CatalogPage: React.FC = () => {
     paginaActual * productosPorPagina
   );
 
-  const categoriaActual = opcionesCategoria.find(cat => cat.key === filtros.categoria)?.label || "Todas las categorías";
+  const categoriaActual = categoriasUnicas.find(cat => cat.key === filtros.categoria)?.label || "Todas las categorías";
 
   return (
     <div className="mb-16">
@@ -255,7 +235,7 @@ export const CatalogPage: React.FC = () => {
                 cambiarFiltro("categoria", seleccionado);
               }}
             >
-              {opcionesCategoria.map(cat => (
+              {categoriasUnicas.map(cat => (
                 <DropdownItem key={cat.key}>{cat.label}</DropdownItem>
               ))}
             </DropdownMenu>
