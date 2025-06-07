@@ -22,11 +22,15 @@
 
 >cd frontend
 
-## Instala las dependencias de Node.js:
+## Instalar dependencias de Node.js:
 >npm install
 
-## Para visualizar el front en desarrollo: 
+## Para visualizar el front en desarrollo (Si el servidor Django esta prendido muestra el backend): 
 >npm run dev
 
 ## Para generar el build del frontend en el backend:
 >npm run build
+
+
+-- Otros
+
