@@ -9,10 +9,10 @@ Proyecto web para la ferretería FERREMAS, desarrollado con un stack moderno de 
 - **Backend**: [Django](https://www.djangoproject.com/) (Python)
 - **API REST**: [Django REST Framework](https://www.django-rest-framework.org/)
 - **Frontend**: [React](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/)
-- **UI Library**: [HeroUI React](https://heroui.chat/)
+- **UI Library**: [HeroUI React](https://www.heroui.com/)
 - **Routing**: [react-router-dom](https://reactrouter.com/)
-- **Base de datos**: SQLite (desarrollo)/ MySQL (Pendiente de Migración)
-- **Herramientas Adicionales**: Vite (build frontend), Iconify (iconos), TailwindCSS (estilos utilitarios)
+- **Base de datos**: [SQLite](https://www.sqlite.org) (desarrollo)/ [MySQL](https://dev.mysql.com/) (Pendiente de Migración)
+- **Herramientas Adicionales**: [Vite](https://vite.dev/), [Iconify](https://iconify.design/docs/), [TailwindCSS](https://v2.tailwindcss.com/docs)
 
 ---
 
@@ -75,9 +75,6 @@ npm run dev
 
 - David O. Larrondo N.
 
-### Universidad
-
-- DUOC UC - Sede Viña del Mar
 - Integración de Plataformas sección 001D
 
 ---
