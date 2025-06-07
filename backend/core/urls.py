@@ -27,6 +27,11 @@ from .views import (
     AdminEmpleadosListAPIView,
     AdminEmpleadoDetailAPIView,
     CategoriaListAPIView,
+    LoginAPIView, 
+    LogoutAPIView, 
+    RegisterAPIView,
+    PerfilUsuarioAPIView,
+    CSRFTokenView,
 )
 from django.conf import settings
 from django.conf.urls.static import static
@@ -36,6 +41,17 @@ urlpatterns = [
     # Admin y Landing
     path('admin/', admin.site.urls),
     path('', LandingView.as_view(), name='landing'),
+
+    # API Autenticación
+    path('api/auth/login/', LoginAPIView.as_view(), name='api-login'),
+    path('api/auth/logout/', LogoutAPIView.as_view(), name='api-logout'),
+    path('api/auth/register/', RegisterAPIView.as_view(), name='api-register'),
+    
+    # CSRF Token para peticiones AJAX
+    path('api/csrf/', CSRFTokenView.as_view(), name='api-csrf'),
+    
+    # API Usuario
+    path('api/usuario/perfil/', PerfilUsuarioAPIView.as_view(), name='usuario-perfil'),
 
     # API Productos (visible para clientes y empleados)
     path('api/productos/', ProductoListAPIView.as_view(), name='productos-list'),
