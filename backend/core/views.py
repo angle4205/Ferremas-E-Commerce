@@ -23,9 +23,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.utils.decorators import method_decorator
 from django.http import JsonResponse
 
-
 # --- Vistas de navegación ---
-
 
 class LandingView(View):
     """Renderiza la landing page estática del proyecto."""
@@ -38,20 +36,6 @@ class LandingView(View):
             return FileResponse(open(index_path, "rb"), content_type="text/html")
         except FileNotFoundError:
             raise Http404("No se encontró index.html, ¿ejecutaste 'npm run build'?")
-
-
-class ProductoListAPIView(APIView):
-    """
-    Lista todos los productos disponibles para el frontend.
-    """
-
-    def get(self, request):
-        productos = Producto.objects.filter(disponible=True)
-        serializer = ProductoSerializer(
-            productos, many=True, context={"request": request}
-        )
-        return Response(serializer.data)
-
 
 # --- Permisos personalizados ---
 
@@ -182,6 +166,17 @@ class PaginacionFerremas(PageNumberPagination):
 
 # --- API Views ---
 
+class ProductoListAPIView(APIView):
+    """
+    Lista todos los productos disponibles para el frontend.
+    """
+
+    def get(self, request):
+        productos = Producto.objects.filter(disponible=True)
+        serializer = ProductoSerializer(
+            productos, many=True, context={"request": request}
+        )
+        return Response(serializer.data)
 
 class LoginAPIView(APIView):
     permission_classes = [AllowAny]
