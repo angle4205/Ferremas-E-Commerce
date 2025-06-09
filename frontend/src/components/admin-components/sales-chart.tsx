@@ -10,14 +10,14 @@ import {
   YAxis
 } from "recharts";
 
-// Define chart data types
+// Define los tipos de datos del gráfico
 type ChartData = {
   name: string;
   revenue: number;
   orders: number;
 };
 
-// Utility function to format currency
+// Función para formatear moneda
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('es-CL', {
     style: 'currency',
@@ -53,7 +53,6 @@ export const SalesChart = () => {
             key = fecha.getFullYear() + "-" + String(fecha.getMonth() + 1).padStart(2, "0");
           }
           if (!agrupado[key]) agrupado[key] = { revenue: 0, orders: 0 };
-          // Asegura que p.total sea un número válido
           const total = Number(p.total);
           if (!isNaN(total) && isFinite(total)) {
             agrupado[key].revenue += total;
@@ -77,7 +76,6 @@ export const SalesChart = () => {
       });
   }, [selected]);
 
-  // Suma solo valores válidos para evitar bugs
   const totalRevenue = data.reduce((sum, item) => {
     const val = Number(item.revenue);
     return isNaN(val) || !isFinite(val) ? sum : sum + val;
@@ -92,7 +90,7 @@ export const SalesChart = () => {
     <Card>
       <CardHeader className="flex flex-col sm:flex-row gap-2">
         <div className="flex-1">
-          <h3 className="text-lg font-semibold">Sales Overview</h3>
+          <h3 className="text-lg font-semibold">Resumen de Ventas</h3>
         </div>
         <Tabs 
           selectedKey={selected} 
@@ -101,8 +99,8 @@ export const SalesChart = () => {
           color="primary"
           variant="light"
         >
-          <Tab key="weekly" title="Weekly" />
-          <Tab key="monthly" title="Monthly" />
+          <Tab key="weekly" title="Semanal" />
+          <Tab key="monthly" title="Mensual" />
         </Tabs>
       </CardHeader>
       <CardBody>
@@ -168,13 +166,13 @@ export const SalesChart = () => {
         )}
         <div className="flex justify-between mt-4 px-4">
           <div>
-            <p className="text-default-500 text-sm">Ingresos totales</p>
+            <p className="text-default-500 text-sm">Ingresos Totales</p>
             <p className="text-xl font-semibold">
               {formatCurrency(totalRevenue)}
             </p>
           </div>
           <div>
-            <p className="text-default-500 text-sm">Órdenes totales</p>
+            <p className="text-default-500 text-sm">Órdenes Totales</p>
             <p className="text-xl font-semibold">
               {totalOrders}
             </p>

@@ -5,15 +5,14 @@ import { Icon } from "@iconify/react";
 interface CategoriaInventario {
   categoria: string;
   stock_total: number;
-  stock_disponible: number;
 }
 
-const CategoriaItem = ({ categoria, stock_total, stock_disponible }: CategoriaInventario) => {
-  const percentage = stock_total > 0 ? Math.round((stock_disponible / stock_total) * 100) : 0;
+const CategoriaItem = ({ categoria, stock_total, promedio_stock }: { categoria: string; stock_total: number; promedio_stock: number }) => {
+  const percentage = promedio_stock > 0 ? Math.round((stock_total / promedio_stock) * 100) : 0;
   let color: "success" | "warning" | "danger" = "success";
-  if (percentage < 20) {
+  if (percentage < 50) {
     color = "danger";
-  } else if (percentage < 50) {
+  } else if (percentage < 100) {
     color = "warning";
   }
   return (
@@ -27,7 +26,7 @@ const CategoriaItem = ({ categoria, stock_total, stock_disponible }: CategoriaIn
             <div>
               <p className="font-medium">{categoria}</p>
             </div>
-            <p className="text-sm font-medium">{stock_disponible}/{stock_total}</p>
+            <p className="text-sm font-medium">{stock_total}</p> {/* Mostrar solo el número */}
           </div>
           <Progress 
             color={color} 
@@ -48,11 +47,11 @@ type Producto = {
   stock: number;
   valor: number;
   imagen_principal: string;
-  disponible: boolean;
 };
 
 export const InventoryStatus = () => {
   const [categorias, setCategorias] = React.useState<CategoriaInventario[]>([]);
+  const [promedioStock, setPromedioStock] = React.useState(0);
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
@@ -64,20 +63,27 @@ export const InventoryStatus = () => {
       })
       .then((productos: Producto[]) => {
         // Agrupar productos por categoría y sumar stock
-        const agrupado: { [cat: string]: { total: number; disponible: number } } = {};
+        const agrupado: { [cat: string]: number } = {};
         productos.forEach(prod => {
-          if (!agrupado[prod.categoria]) agrupado[prod.categoria] = { total: 0, disponible: 0 };
-          agrupado[prod.categoria].total += prod.stock ?? 0;
-          if (prod.disponible) agrupado[prod.categoria].disponible += prod.stock ?? 0;
+          if (!agrupado[prod.categoria]) agrupado[prod.categoria] = 0;
+          agrupado[prod.categoria] += prod.stock ?? 0;
         });
-        const cats: CategoriaInventario[] = Object.entries(agrupado).map(([categoria, datos]) => ({
+
+        const categoriasData: CategoriaInventario[] = Object.entries(agrupado).map(([categoria, stock_total]) => ({
           categoria,
-          stock_total: datos.total,
-          stock_disponible: datos.disponible,
+          stock_total,
         }));
-        setCategorias(cats);
+
+        const totalStock = categoriasData.reduce((sum, cat) => sum + cat.stock_total, 0);
+        const promedio = categoriasData.length > 0 ? totalStock / categoriasData.length : 0;
+
+        setCategorias(categoriasData);
+        setPromedioStock(promedio);
       })
-      .catch(() => setCategorias([]))
+      .catch(() => {
+        setCategorias([]);
+        setPromedioStock(0);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -93,12 +99,12 @@ export const InventoryStatus = () => {
         ) : categorias.length === 0 ? (
           <div className="text-center text-danger-500 py-8">No hay datos de inventario.</div>
         ) : (
-          categorias.map((cat, idx) => (
+          categorias.map((cat) => (
             <CategoriaItem
               key={cat.categoria}
               categoria={cat.categoria}
               stock_total={cat.stock_total}
-              stock_disponible={cat.stock_disponible}
+              promedio_stock={promedioStock}
             />
           ))
         )}
