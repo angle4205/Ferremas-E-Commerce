@@ -1,6 +1,18 @@
 import React from "react";
 import {
-  Card, CardBody, CardFooter, Button, Chip, Input, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Pagination, Breadcrumbs, BreadcrumbItem
+  Card,
+  CardBody,
+  CardFooter,
+  Button,
+  Chip,
+  Input,
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+  Pagination,
+  Breadcrumbs,
+  BreadcrumbItem,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
 
@@ -25,6 +37,31 @@ interface EstadoFiltros {
 function formatoCLP(valor: number) {
   return valor.toLocaleString("es-CL", { style: "currency", currency: "CLP", minimumFractionDigits: 0 });
 }
+
+// Función para agregar un producto al carrito
+const agregarAlCarrito = async (productoId: number) => {
+  try {
+    const response = await fetch(`http://localhost:8000/api/cart/items/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include", // Incluye cookies para autenticación
+      body: JSON.stringify({ producto_id: productoId, cantidad: 1 }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Error al agregar el producto al carrito");
+    }
+
+    const data = await response.json();
+    console.log("Producto agregado al carrito:", data);
+    alert("Producto agregado al carrito");
+  } catch (error) {
+    console.error(error);
+    alert("No se pudo agregar el producto al carrito. Inténtalo de nuevo.");
+  }
+};
 
 const TarjetaProducto: React.FC<{ producto: Producto }> = ({ producto }) => {
   let imagenUrl: string | null = null;
@@ -99,6 +136,7 @@ const TarjetaProducto: React.FC<{ producto: Producto }> = ({ producto }) => {
           variant="flat"
           startContent={<Icon icon="lucide:shopping-cart" size={18} />}
           disabled={!producto.disponible}
+          onClick={() => agregarAlCarrito(producto.id)} // Llama a la función al hacer clic
         >
           Agregar al carrito
         </Button>

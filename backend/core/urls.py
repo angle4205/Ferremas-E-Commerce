@@ -38,6 +38,9 @@ from .views import (
     AdminOrderUpdateAPIView,
     AdminFinancialReportAPIView,
     TurnoHistorialAPIView,
+    CartAPIView, 
+    CartItemUpdateAPIView, 
+    CartItemDeleteAPIView,
 )
 from django.conf import settings
 from django.conf.urls.static import static
@@ -62,6 +65,11 @@ urlpatterns = [
     # API Productos
     path('api/productos/', ProductoListAPIView.as_view(), name='productos-list'),
     path("api/categorias/", CategoriaListAPIView.as_view()),
+
+    # API Carrito
+    path("api/cart/", CartAPIView.as_view(), name="cart"),
+    path("api/cart/items/<int:item_id>/", CartItemUpdateAPIView.as_view(), name="cart-item-update"),
+    path("api/cart/items/<int:item_id>/delete/", CartItemDeleteAPIView.as_view(), name="cart-item-delete"),
 
     # API Empleados - Turnos y perfil
     path('api/empleados/marcar_entrada/', MarcarEntradaAPIView.as_view(), name='empleado-marcar-entrada'),

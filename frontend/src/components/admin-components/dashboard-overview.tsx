@@ -86,12 +86,6 @@ export const DashboardOverview = () => {
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold">Resumen general</h1>
-        <div className="flex items-center gap-2">
-          <span className="text-default-500 text-sm">Período:</span>
-          <select className="bg-content2 text-foreground border border-divider rounded-md px-3 py-1 text-sm" disabled>
-            <option>Últimos 30 días</option>
-          </select>
-        </div>
       </div>
       
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

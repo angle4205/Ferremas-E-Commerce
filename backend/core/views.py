@@ -24,6 +24,10 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.utils.decorators import method_decorator
 from django.http import JsonResponse
 from django.db.models import Sum, Count
+from .models import Cart, ItemCarrito
+from .serializers import ItemCarritoSerializer
+from rest_framework.permissions import IsAuthenticated
+
 
 # --- Vistas de navegación ---
 
@@ -214,6 +218,56 @@ class RegisterAPIView(APIView):
         return Response(
             {"success": True, "mensaje": "Usuario registrado correctamente"}
         )
+
+class CartAPIView(APIView):
+    """
+    Devuelve los items del carrito y el total.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Obtener el carrito del usuario autenticado
+        cart, _ = Cart.objects.get_or_create(user=request.user, estado="ACTIVO")
+        items = ItemCarrito.objects.filter(carrito=cart)
+        total = sum(item.subtotal() for item in items)
+        return Response({
+            "items": ItemCarritoSerializer(items, many=True).data,
+            "total": total
+        })
+
+
+class CartItemUpdateAPIView(APIView):
+    """
+    Actualiza la cantidad de un producto en el carrito.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, item_id):
+        try:
+            item = ItemCarrito.objects.get(id=item_id, carrito__user=request.user, carrito__estado="ACTIVO")
+            cantidad = request.data.get("quantity")
+            if not cantidad or int(cantidad) < 1:
+                return Response({"error": "La cantidad debe ser mayor a 0."}, status=status.HTTP_400_BAD_REQUEST)
+            item.cantidad = int(cantidad)
+            item.save()
+            return Response(ItemCarritoSerializer(item).data)
+        except ItemCarrito.DoesNotExist:
+            return Response({"error": "El item no existe o no pertenece al carrito activo."}, status=status.HTTP_404_NOT_FOUND)
+
+
+class CartItemDeleteAPIView(APIView):
+    """
+    Elimina un producto del carrito.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, item_id):
+        try:
+            item = ItemCarrito.objects.get(id=item_id, carrito__user=request.user, carrito__estado="ACTIVO")
+            item.delete()
+            return Response({"success": "El item fue eliminado del carrito."}, status=status.HTTP_204_NO_CONTENT)
+        except ItemCarrito.DoesNotExist:
+            return Response({"error": "El item no existe o no pertenece al carrito activo."}, status=status.HTTP_404_NOT_FOUND)
 
 class PerfilUsuarioAPIView(APIView):
     permission_classes = [IsAuthenticated]

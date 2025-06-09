@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   Navbar,
   NavbarBrand,
@@ -23,6 +23,7 @@ import { LoginForm } from "./components/login-form";
 import { RegisterForm } from "./components/register-form";
 import { UserProfile } from "./components/user-profile";
 import { AdminDashboard } from "./components/admin-dashboard";
+import CartModal from "./components/cart-modal"; // Importa el CartModal
 
 type PerfilUsuario = {
   id: number;
@@ -39,8 +40,8 @@ type PerfilUsuario = {
 };
 
 export default function App() {
-  const [currentPage, setCurrentPage] = React.useState("inicio");
-  const [darkMode, setDarkMode] = React.useState(() => {
+  const [currentPage, setCurrentPage] = useState("inicio");
+  const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("theme");
       if (saved) return saved === "dark";
@@ -49,7 +50,10 @@ export default function App() {
     return false;
   });
 
-  React.useEffect(() => {
+  const [cartItems, setCartItems] = useState<number>(0); // Estado para la cantidad de items en el carrito
+  const [isCartModalOpen, setIsCartModalOpen] = useState(false); // Estado para abrir/cerrar el modal del carrito
+
+  useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.add("dark");
       localStorage.setItem("theme", "dark");
@@ -59,24 +63,24 @@ export default function App() {
     }
   }, [darkMode]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     setDarkMode(document.documentElement.classList.contains("dark"));
   }, []);
 
   // Estado real de usuario autenticado
-  const [perfil, setPerfil] = React.useState<PerfilUsuario | null>(null);
-  const [perfilLoading, setPerfilLoading] = React.useState(true);
-  const [authPage, setAuthPage] = React.useState<null | "login" | "register" | "profile">(null);
+  const [perfil, setPerfil] = useState<PerfilUsuario | null>(null);
+  const [perfilLoading, setPerfilLoading] = useState(true);
+  const [authPage, setAuthPage] = useState<null | "login" | "register" | "profile">(null);
 
   // Al cargar la app, intenta obtener el perfil (mantener sesión tras F5)
-  React.useEffect(() => {
+  useEffect(() => {
     setPerfilLoading(true);
     fetch("http://localhost:8000/api/usuario/perfil/", { credentials: "include" })
-      .then(res => {
+      .then((res) => {
         if (res.ok) return res.json();
         throw new Error();
       })
-      .then(data => {
+      .then((data) => {
         setPerfil(data);
         setPerfilLoading(false);
       })
@@ -86,11 +90,26 @@ export default function App() {
       });
   }, []);
 
+  // Cargar la cantidad de items en el carrito
+  useEffect(() => {
+    fetch("http://localhost:8000/api/cart/", { credentials: "include" })
+      .then((res) => {
+        if (res.ok) return res.json();
+        throw new Error();
+      })
+      .then((data) => {
+        setCartItems(data.items.length); // Actualiza la cantidad de items en el carrito
+      })
+      .catch(() => {
+        setCartItems(0);
+      });
+  }, []);
+
   // Cuando el login es exitoso
   const handleLoginSuccess = () => {
     fetch("http://localhost:8000/api/usuario/perfil/", { credentials: "include" })
-      .then(res => res.ok ? res.json() : null)
-      .then(data => setPerfil(data))
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setPerfil(data))
       .catch(() => setPerfil(null));
     setAuthPage(null);
   };
@@ -101,7 +120,7 @@ export default function App() {
   };
 
   // Estado para filtro de categoría en catálogo
-  const [catalogoCategoria, setCatalogoCategoria] = React.useState<string | null>(null);
+  const [catalogoCategoria, setCatalogoCategoria] = useState<string | null>(null);
 
   // Navegación centralizada
   const navigateTo = (page: string, categoria?: string) => {
@@ -203,8 +222,13 @@ export default function App() {
             </Button>
           </NavbarItem>
           <NavbarItem>
-            <Badge content="3" color="primary">
-              <Button isIconOnly variant="light" radius="full">
+            <Badge content={cartItems} color="primary">
+              <Button
+                isIconOnly
+                variant="light"
+                radius="full"
+                onClick={() => setIsCartModalOpen(true)} // Abre el modal del carrito
+              >
                 <Icon icon="lucide:shopping-cart" className="text-default-500" size={20} />
               </Button>
             </Badge>
@@ -256,6 +280,16 @@ export default function App() {
         ) : null}
       </main>
       <Footer navigateTo={navigateTo} />
+
+      {/* Modal del carrito */}
+      <CartModal
+        isOpen={isCartModalOpen}
+        onClose={() => setIsCartModalOpen(false)}
+        onCheckout={() => {
+          setIsCartModalOpen(false);
+          navigateTo("checkout"); // Redirige a la página de checkout
+        }}
+      />
     </div>
   );
 }

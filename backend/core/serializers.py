@@ -5,6 +5,7 @@ from .models import (
     Pedido,
     ItemPedido,
     Categoria,
+    ItemCarrito,
 )
 from django.contrib.auth.models import User
 
@@ -85,6 +86,23 @@ class PedidoDetailSerializer(serializers.ModelSerializer):
         if obj.bodeguero_asignado and hasattr(obj.bodeguero_asignado, "user"):
             return obj.bodeguero_asignado.user.username
         return None
+
+# --- ItemCarritoSerializer (para items en el carrito de compras) ---
+
+class ItemCarritoSerializer(serializers.ModelSerializer):
+    product = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ItemCarrito
+        fields = ["id", "product", "cantidad", "precio_unitario", "subtotal"]
+
+    def get_product(self, obj):
+        return {
+            "id": obj.producto.id,
+            "name": obj.producto.nombre,
+            "price": obj.producto.valor,
+            "image": obj.producto.imagen_principal.url if obj.producto.imagen_principal else None,
+        }
 
 # --- UserProfileSerializer (perfil de usuario extendido) ---
 
