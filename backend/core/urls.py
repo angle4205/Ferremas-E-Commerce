@@ -32,6 +32,12 @@ from .views import (
     RegisterAPIView,
     PerfilUsuarioAPIView,
     CSRFTokenView,
+    AdminOverviewAPIView,
+    AdminOrderListAPIView,
+    AdminOrderAssignAPIView,
+    AdminOrderUpdateAPIView,
+    AdminFinancialReportAPIView,
+    TurnoHistorialAPIView,
 )
 from django.conf import settings
 from django.conf.urls.static import static
@@ -53,7 +59,7 @@ urlpatterns = [
     # API Usuario
     path('api/usuario/perfil/', PerfilUsuarioAPIView.as_view(), name='usuario-perfil'),
 
-    # API Productos (visible para clientes y empleados)
+    # API Productos
     path('api/productos/', ProductoListAPIView.as_view(), name='productos-list'),
     path("api/categorias/", CategoriaListAPIView.as_view()),
 
@@ -61,6 +67,7 @@ urlpatterns = [
     path('api/empleados/marcar_entrada/', MarcarEntradaAPIView.as_view(), name='empleado-marcar-entrada'),
     path('api/empleados/marcar_salida/', MarcarSalidaAPIView.as_view(), name='empleado-marcar-salida'),
     path('api/empleados/perfil/', PerfilEmpleadoAPIView.as_view(), name='empleado-perfil'),
+    path('api/empleados/historial_turnos/', TurnoHistorialAPIView.as_view(), name='empleado-historial-turnos'),
 
     # API Bodeguero - Pedidos asignados
     path('api/bodeguero/ordenes/', BodegueroOrdenesAPIView.as_view(), name='bodeguero-ordenes'),
@@ -69,7 +76,12 @@ urlpatterns = [
     # API Contador - Reportes
     path('api/contador/reportes/', ContadorReportesAPIView.as_view(), name='contador-reportes'),
 
-    # API Admin - Gestión de empleados
+    # API Admin
+    path('api/admin/orders/', AdminOrderListAPIView.as_view(), name='admin-orders-list'),
+    path('api/admin/orders/<int:pedido_id>/assign/', AdminOrderAssignAPIView.as_view(), name='admin-order-assign'),
+    path('api/admin/orders/<int:pedido_id>/', AdminOrderUpdateAPIView.as_view(), name='admin-order-update'),
+    path('api/admin/reportes/financieros/', AdminFinancialReportAPIView.as_view(), name='admin-financial-report'),
+    path('api/admin/overview/', AdminOverviewAPIView.as_view(), name='admin-overview'),
     path('api/admin/empleados/', AdminEmpleadosListAPIView.as_view(), name='admin-empleados-list'),
     path('api/admin/empleados/<int:empleado_id>/', AdminEmpleadoDetailAPIView.as_view(), name='admin-empleado-detalle'),
 ]

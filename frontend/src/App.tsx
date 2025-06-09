@@ -22,6 +22,7 @@ import { CatalogPage } from "./components/catalog-page";
 import { LoginForm } from "./components/login-form";
 import { RegisterForm } from "./components/register-form";
 import { UserProfile } from "./components/user-profile";
+import { AdminDashboard } from "./components/admin-dashboard";
 
 type PerfilUsuario = {
   id: number;
@@ -99,10 +100,37 @@ export default function App() {
     setAuthPage("login");
   };
 
-  const navigateTo = (page: string) => {
+  // Estado para filtro de categoría en catálogo
+  const [catalogoCategoria, setCatalogoCategoria] = React.useState<string | null>(null);
+
+  // Navegación centralizada
+  const navigateTo = (page: string, categoria?: string) => {
     setAuthPage(null);
     setCurrentPage(page);
+    if (page === "catalogo") {
+      setCatalogoCategoria(categoria ?? null);
+    }
   };
+
+  // Detecta si estamos en el dashboard
+  const isDashboard = currentPage === "dashboard";
+
+  if (isDashboard) {
+    return <AdminDashboard
+      darkMode={darkMode}
+      setDarkMode={setDarkMode}
+      perfil={perfil}
+      onProfile={() => {
+        setCurrentPage("inicio");
+        setAuthPage("profile");
+      }}
+      onLogout={() => {
+        setPerfil(null);
+        setCurrentPage("inicio");
+        setAuthPage("login");
+      }}
+    />;
+  }
 
   return (
     <div className="min-h-screen bg-background dark:bg-background-dark">
@@ -205,21 +233,25 @@ export default function App() {
                 setAuthPage(null);
                 setCurrentPage("dashboard");
               }}
+              onLogout={() => {
+                setPerfil(null);
+                setCurrentPage("inicio");
+                setAuthPage("login");
+              }}
             />
           )
         ) : currentPage === "inicio" ? (
           <>
             <HeroSection />
-            <FeaturedCategories />
-            <PopularProducts />
+            <FeaturedCategories navigateTo={navigateTo} />
+            <PopularProducts navigateTo={navigateTo} />
             <PromoBanner />
             <ServiceFeatures />
           </>
         ) : currentPage === "catalogo" ? (
-          <CatalogPage />
+          <CatalogPage categoriaInicial={catalogoCategoria} />
         ) : null}
       </main>
-
       <Footer navigateTo={navigateTo} />
     </div>
   );

@@ -7,12 +7,13 @@ from rest_framework.response import Response
 from rest_framework import status, permissions
 from rest_framework.generics import get_object_or_404
 from rest_framework.pagination import PageNumberPagination
-from .models import Producto, UserProfile, Pedido, ItemPedido, Categoria
+from .models import Producto, UserProfile, Pedido, ItemPedido, Categoria, Cliente, TurnoEmpleado
 from .serializers import (
     ProductoSerializer,
     ProductoEnItemPedidoSerializer,
     ItemPedidoSerializer,
     PedidoSimpleSerializer,
+    PedidoDetailSerializer,
     UserProfileSerializer,
 )
 from django.utils import timezone
@@ -22,6 +23,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.utils.decorators import method_decorator
 from django.http import JsonResponse
+from django.db.models import Sum, Count
 
 # --- Vistas de navegación ---
 
@@ -39,7 +41,6 @@ class LandingView(View):
 
 # --- Permisos personalizados ---
 
-
 class IsEmpleado(permissions.BasePermission):
     """Permite acceso solo a empleados autenticados."""
 
@@ -48,7 +49,6 @@ class IsEmpleado(permissions.BasePermission):
             hasattr(request.user, "profile")
             and getattr(request.user.profile.rol, "nombre", None) == "EMPLEADO"
         )
-
 
 class IsBodeguero(permissions.BasePermission):
     """Permite acceso solo a empleados con subrol BODEGUERO."""
@@ -59,7 +59,6 @@ class IsBodeguero(permissions.BasePermission):
             and request.user.profile.tipo_empleado == "BODEGUERO"
         )
 
-
 class IsContador(permissions.BasePermission):
     """Permite acceso solo a empleados con subrol CONTADOR."""
 
@@ -68,7 +67,6 @@ class IsContador(permissions.BasePermission):
             hasattr(request.user, "profile")
             and request.user.profile.tipo_empleado == "CONTADOR"
         )
-
 
 class IsAdminEmpleado(permissions.BasePermission):
     """Permite acceso solo a empleados con rol ADMINISTRADOR."""
@@ -79,9 +77,7 @@ class IsAdminEmpleado(permissions.BasePermission):
             and getattr(request.user.profile.rol, "nombre", None) == "ADMINISTRADOR"
         )
 
-
 # --- Helpers privados y mixins ---
-
 
 def _respuesta_ok(data=None, mensaje="", status_code=status.HTTP_200_OK):
     resp = {"success": True, "mensaje": mensaje}
@@ -89,10 +85,8 @@ def _respuesta_ok(data=None, mensaje="", status_code=status.HTTP_200_OK):
         resp.update(data)
     return Response(resp, status=status_code)
 
-
 def _respuesta_error(mensaje, status_code=status.HTTP_400_BAD_REQUEST):
     return Response({"success": False, "mensaje": mensaje}, status=status_code)
-
 
 def _user_equiv(user1, user2):
     """
@@ -118,7 +112,6 @@ def _user_equiv(user1, user2):
         return user2.user_id == user1.pk
     return False
 
-
 def _bodeguero_asignado_equals_user(asignado, user):
     """
     Compara robustamente si el usuario autenticado es el bodeguero asignado al pedido.
@@ -127,7 +120,6 @@ def _bodeguero_asignado_equals_user(asignado, user):
     return _user_equiv(asignado, user) or _user_equiv(
         asignado, getattr(user, "profile", None)
     )
-
 
 def _get_pedido_bodeguero(pedido_id, user):
     pedido = get_object_or_404(
@@ -139,7 +131,6 @@ def _get_pedido_bodeguero(pedido_id, user):
     if not _bodeguero_asignado_equals_user(pedido.bodeguero_asignado, user):
         return None
     return pedido
-
 
 def _validar_transicion_estado_pedido(estado_actual, nuevo_estado):
     """
@@ -157,12 +148,10 @@ def _validar_transicion_estado_pedido(estado_actual, nuevo_estado):
         return False
     return nuevo_estado in flujo.get(estado_actual, [])
 
-
 class PaginacionFerremas(PageNumberPagination):
     page_size = 10
     page_size_query_param = "page_size"
     max_page_size = 50
-
 
 # --- API Views ---
 
@@ -193,14 +182,12 @@ class LoginAPIView(APIView):
             status=status.HTTP_401_UNAUTHORIZED,
         )
 
-
 class LogoutAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
         logout(request)
         return Response({"success": True, "mensaje": "Logout exitoso"})
-
 
 class RegisterAPIView(APIView):
     permission_classes = [AllowAny]
@@ -227,7 +214,6 @@ class RegisterAPIView(APIView):
         return Response(
             {"success": True, "mensaje": "Usuario registrado correctamente"}
         )
-
 
 class PerfilUsuarioAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -261,7 +247,6 @@ class PerfilUsuarioAPIView(APIView):
         }
         return Response(data)
 
-
 class MarcarEntradaAPIView(APIView):
     """
     Permite a cualquier empleado marcar su entrada a turno.
@@ -282,7 +267,6 @@ class MarcarEntradaAPIView(APIView):
         return _respuesta_ok(
             {"empleado": serializer.data}, "Entrada a turno registrada correctamente."
         )
-
 
 class MarcarSalidaAPIView(APIView):
     """
@@ -305,7 +289,6 @@ class MarcarSalidaAPIView(APIView):
             {"empleado": serializer.data}, "Salida de turno registrada correctamente."
         )
 
-
 class PerfilEmpleadoAPIView(APIView):
     """
     Devuelve el perfil y subrol del usuario autenticado.
@@ -322,6 +305,31 @@ class PerfilEmpleadoAPIView(APIView):
         serializer = UserProfileSerializer(empleado)
         return _respuesta_ok({"empleado": serializer.data})
 
+class TurnoHistorialAPIView(APIView):
+    """
+    Devuelve el historial de turnos del empleado autenticado.
+    """
+
+    permission_classes = [permissions.IsAuthenticated, IsEmpleado]
+
+    def get(self, request):
+        empleado = getattr(request.user, "profile", None)
+        if not empleado:
+            return _respuesta_error(
+                "No se encontró el perfil de empleado.", status.HTTP_403_FORBIDDEN
+            )
+        turnos = TurnoEmpleado.objects.filter(empleado=empleado).order_by('-entrada')
+        data = [
+            {
+                "id": turno.id,
+                "entrada": turno.entrada,
+                "salida": turno.salida,
+                "comprobante_entrada": turno.comprobante_entrada.url if turno.comprobante_entrada else None,
+                "duracion_horas": turno.duracion_horas(),
+            }
+            for turno in turnos
+        ]
+        return _respuesta_ok({"historial_turnos": data})
 
 class BodegueroOrdenesAPIView(APIView):
     """
@@ -332,7 +340,6 @@ class BodegueroOrdenesAPIView(APIView):
 
     def get(self, request):
         bodeguero = request.user
-        # Incluye ambos tipos de asignación (User o UserProfile)
         pedidos = (
             Pedido.objects.filter(
                 models.Q(bodeguero_asignado=bodeguero)
@@ -352,7 +359,6 @@ class BodegueroOrdenesAPIView(APIView):
                 "mensaje": "Pedidos asignados listados correctamente.",
             }
         )
-
 
 class BodegueroOrdenEstadoAPIView(APIView):
     """
@@ -394,7 +400,6 @@ class BodegueroOrdenEstadoAPIView(APIView):
             {"pedido": serializer.data}, "Estado del pedido actualizado."
         )
 
-
 class ContadorReportesAPIView(APIView):
     """
     Permite al contador ver reportes financieros básicos.
@@ -420,7 +425,6 @@ class ContadorReportesAPIView(APIView):
             "Reporte financiero generado correctamente.",
         )
 
-
 class AdminEmpleadosListAPIView(APIView):
     """
     Permite al administrador listar todos los empleados, paginados.
@@ -445,7 +449,6 @@ class AdminEmpleadosListAPIView(APIView):
             }
         )
 
-
 class AdminEmpleadoDetailAPIView(APIView):
     """
     Permite al administrador ver el detalle de un empleado.
@@ -461,7 +464,6 @@ class AdminEmpleadoDetailAPIView(APIView):
         serializer = UserProfileSerializer(empleado)
         return _respuesta_ok({"empleado": serializer.data})
 
-
 class CategoriaListAPIView(APIView):
     def get(self, request):
         categorias = Categoria.objects.all()
@@ -470,7 +472,122 @@ class CategoriaListAPIView(APIView):
             for cat in categorias
         ]
         return Response(data)
-    
+
+class AdminOverviewAPIView(APIView):
+    """
+    Devuelve el resumen general para el dashboard de administrador.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Ingresos totales (solo pedidos entregados)
+        total_revenue = Pedido.objects.filter(estado="ENTREGADO").aggregate(
+            total=Sum("total")
+        )["total"] or 0
+
+        # Ingresos del mes anterior
+        from django.utils import timezone
+        from datetime import timedelta
+
+        now = timezone.now()
+        last_month = now - timedelta(days=30)
+        revenue_last_month = Pedido.objects.filter(
+            estado="ENTREGADO", fecha_creacion__gte=last_month
+        ).aggregate(total=Sum("total"))["total"] or 0
+
+        # Órdenes totales y cambio
+        orders = Pedido.objects.filter(estado="ENTREGADO").count()
+        orders_last_month = Pedido.objects.filter(
+            estado="ENTREGADO", fecha_creacion__gte=last_month
+        ).count()
+
+        # Clientes totales y cambio
+        customers = Cliente.objects.count()
+        customers_last_month = Cliente.objects.filter(
+            fecha_registro__gte=last_month
+        ).count()
+
+        # Valor inventario (suma de stock * valor de cada producto)
+        from .models import Producto
+        inventory_value = sum([
+            int(p.stock) * int(p.valor)
+            for p in Producto.objects.all()
+        ])
+
+        # Cambios porcentuales (evita división por cero)
+        def percent_change(current, previous):
+            if previous == 0:
+                return 0.0
+            return ((current - previous) / previous) * 100
+
+        data = {
+            "total_revenue": total_revenue,
+            "revenue_change": percent_change(revenue_last_month, total_revenue),
+            "orders": orders,
+            "orders_change": percent_change(orders_last_month, orders),
+            "customers": customers,
+            "customers_change": percent_change(customers_last_month, customers),
+            "inventory_value": inventory_value,
+            "inventory_change": 0.0,  # Puedes calcularlo si tienes histórico
+        }
+        return Response(data)
+
+# --- Órdenes para dashboard admin: listar, asignar, modificar ---
+
+class AdminOrderListAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdminEmpleado]
+
+    def get(self, request):
+        pedidos = Pedido.objects.select_related("cliente", "bodeguero_asignado").order_by("-fecha_creacion")
+        serializer = PedidoSimpleSerializer(pedidos, many=True)
+        return Response(serializer.data)
+
+class AdminOrderAssignAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdminEmpleado]
+
+    def post(self, request, pedido_id):
+        pedido = get_object_or_404(Pedido, id=pedido_id)
+        bodeguero_id = request.data.get("bodeguero_id")
+        if bodeguero_id:
+            bodeguero = get_object_or_404(UserProfile, id=bodeguero_id)
+            pedido.bodeguero_asignado = bodeguero
+            pedido.save()
+            return Response({"success": True, "mensaje": "Bodeguero asignado manualmente."})
+        # Asignación automática (ejemplo simple: primer bodeguero disponible)
+        bodegueros = UserProfile.objects.filter(tipo_empleado="BODEGUERO", en_turno=True)
+        if bodegueros.exists():
+            pedido.bodeguero_asignado = bodegueros.first()
+            pedido.save()
+            return Response({"success": True, "mensaje": "Bodeguero asignado automáticamente."})
+        return Response({"success": False, "mensaje": "No hay bodegueros disponibles."}, status=400)
+
+class AdminOrderUpdateAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdminEmpleado]
+
+    def patch(self, request, pedido_id):
+        pedido = get_object_or_404(Pedido, id=pedido_id)
+        estado = request.data.get("estado")
+        if estado:
+            pedido.actualizar_estado(estado, request.user)
+        # Otros campos editables...
+        serializer = PedidoDetailSerializer(pedido)
+        return Response(serializer.data)
+
+# --- Reportes financieros para admin ---
+
+class AdminFinancialReportAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdminEmpleado]
+
+    def get(self, request):
+        total_ventas = Pedido.objects.filter(estado="ENTREGADO").aggregate(total=Sum("total"))["total"] or 0
+        pedidos_entregados = Pedido.objects.filter(estado="ENTREGADO").count()
+        pedidos_cancelados = Pedido.objects.filter(estado="CANCELADO").count()
+        return Response({
+            "total_ventas": total_ventas,
+            "pedidos_entregados": pedidos_entregados,
+            "pedidos_cancelados": pedidos_cancelados,
+        })
+
 @method_decorator(ensure_csrf_cookie, name="dispatch")
 class CSRFTokenView(APIView):
     """

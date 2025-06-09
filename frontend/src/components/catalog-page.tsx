@@ -12,6 +12,7 @@ interface Producto {
   imagen_principal: string;
   categoria: string;
   disponible: boolean;
+  rating?: number;
 }
 
 interface EstadoFiltros {
@@ -25,60 +26,110 @@ function formatoCLP(valor: number) {
   return valor.toLocaleString("es-CL", { style: "currency", currency: "CLP", minimumFractionDigits: 0 });
 }
 
-const TarjetaProducto: React.FC<{ producto: Producto }> = ({ producto }) => (
-  <Card className="w-full" isPressable disableRipple>
-    <CardBody className="p-0 overflow-hidden">
-      <div className="relative w-full aspect-square bg-white flex items-center justify-center" style={{ minHeight: 0, height: 0, paddingBottom: "100%" }}>
-        <img
-          src={
-            producto.imagen_principal.startsWith("http")
-              ? producto.imagen_principal
-              : `http://localhost:8000${producto.imagen_principal}`
-          }
-          alt={producto.nombre}
-          className="absolute top-0 left-0 w-full h-full object-contain"
-          style={{ background: "#fff" }}
-        />
-        {!producto.disponible && (
-          <Chip color="danger" size="sm" className="absolute top-2 left-2 z-10">
-            Sin stock
-          </Chip>
-        )}
-      </div>
-      <div className="p-4">
-        <span className="block text-xs text-default-400 mb-1">{producto.marca}</span>
-        <h3 className="font-medium text-foreground/90 line-clamp-1">{producto.nombre}</h3>
-        <div className="flex items-center gap-2 mt-2">
-          <span className="font-semibold">{formatoCLP(producto.valor)}</span>
-        </div>
-      </div>
-    </CardBody>
-    <CardFooter className="pt-0">
-      <Button
-        fullWidth
-        color="primary"
-        variant="flat"
-        startContent={<Icon icon="lucide:shopping-cart" size={18} />}
-        disabled={!producto.disponible}
-      >
-        Agregar al carrito
-      </Button>
-    </CardFooter>
-  </Card>
-);
+const TarjetaProducto: React.FC<{ producto: Producto }> = ({ producto }) => {
+  let imagenUrl: string | null = null;
+  if (producto.imagen_principal && typeof producto.imagen_principal === "string" && producto.imagen_principal.trim() !== "") {
+    imagenUrl = producto.imagen_principal.startsWith("http")
+      ? producto.imagen_principal
+      : `http://localhost:8000${producto.imagen_principal}`;
+  }
 
-export const CatalogPage: React.FC = () => {
+  // Renderiza estrellas según el rating (de 0 a 5)
+  const renderStars = (rating: number = 0) => {
+    const stars = [];
+    for (let i = 1; i <= 5; i++) {
+      stars.push(
+        <Icon
+          key={i}
+          icon={i <= Math.round(rating) ? "lucide:star" : "lucide:star-off"}
+          className={`text-yellow-400 ${i <= Math.round(rating) ? "" : "opacity-40"}`}
+          width={18}
+          height={18}
+        />
+      );
+    }
+    return <div className="flex items-center gap-0.5">{stars}</div>;
+  };
+
+  return (
+    <Card className="w-full" isPressable disableRipple>
+      <CardBody className="p-0 overflow-hidden">
+        <div
+          className="relative w-full aspect-square bg-white flex items-center justify-center"
+          style={{ minHeight: 0, height: 0, paddingBottom: "100%" }}
+        >
+          {imagenUrl ? (
+            <img
+              src={imagenUrl}
+              alt={producto.nombre}
+              className="absolute top-0 left-0 w-full h-full object-contain"
+              style={{ background: "#fff" }}
+            />
+          ) : (
+            <Icon
+              icon="lucide:image"
+              className="absolute top-0 left-0 w-full h-full text-default-300"
+              style={{ fontSize: 64 }}
+            />
+          )}
+          {!producto.disponible && (
+            <Chip color="danger" size="sm" className="absolute top-2 left-2 z-10">
+              Sin stock
+            </Chip>
+          )}
+        </div>
+        <div className="p-4">
+          <span className="block text-xs text-default-400 mb-1">{producto.marca}</span>
+          <h3 className="font-medium text-foreground/90 line-clamp-1">{producto.nombre}</h3>
+          <div className="flex items-center gap-2 mt-2 mb-1">
+            {renderStars(producto.rating)}
+            {typeof producto.rating === "number" && (
+              <span className="text-xs text-default-400">({producto.rating.toFixed(1)})</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="font-semibold">{formatoCLP(producto.valor)}</span>
+          </div>
+        </div>
+      </CardBody>
+      <CardFooter className="pt-0">
+        <Button
+          fullWidth
+          color="primary"
+          variant="flat"
+          startContent={<Icon icon="lucide:shopping-cart" size={18} />}
+          disabled={!producto.disponible}
+        >
+          Agregar al carrito
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+};
+
+// Cambia aquí: acepta categoriaInicial como prop
+export const CatalogPage: React.FC<{ categoriaInicial?: string | null }> = ({ categoriaInicial }) => {
   const [productos, setProductos] = React.useState<Producto[]>([]);
   const [cargando, setCargando] = React.useState(true);
 
+  // Usa categoriaInicial para el filtro inicial
   const [filtros, setFiltros] = React.useState<EstadoFiltros>({
-    categoria: "todos",
+    categoria: categoriaInicial || "todos",
     rangoPrecio: "todos",
     ordenarPor: "populares",
     busqueda: "",
   });
   const [paginaActual, setPaginaActual] = React.useState(1);
   const productosPorPagina = 12;
+
+  // Si cambia la prop, actualiza el filtro de categoría
+  React.useEffect(() => {
+    if (categoriaInicial && categoriaInicial !== filtros.categoria) {
+      setFiltros(f => ({ ...f, categoria: categoriaInicial }));
+      setPaginaActual(1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoriaInicial]);
 
   React.useEffect(() => {
     setCargando(true);
@@ -94,6 +145,7 @@ export const CatalogPage: React.FC = () => {
             imagen_principal: item.imagen_principal,
             categoria: item.categoria,
             disponible: !!item.disponible,
+            rating: typeof item.rating === "number" ? item.rating : Math.random() * 2 + 3,
           }))
         );
         setCargando(false);
@@ -177,7 +229,7 @@ export const CatalogPage: React.FC = () => {
         resultado.sort((a, b) => b.id - a.id);
         break;
       default:
-        // popoulares: podrías implementar lógica de popularidad si la tienes
+        // populares: podrías implementar lógica de popularidad si la tienes
         break;
     }
 

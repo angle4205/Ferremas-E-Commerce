@@ -1,12 +1,12 @@
 import React from "react";
 import { Card, CardBody, Button } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import { useNavigate } from "react-router-dom";
 
 interface Categoria {
   id: number;
   nombre: string;
   descripcion?: string;
+  imagen_principal?: string | null;
 }
 
 const ICONOS_CATEGORIAS: Record<string, string> = {
@@ -20,32 +20,27 @@ const ICONOS_CATEGORIAS: Record<string, string> = {
   "Seguridad Industrial": "lucide:shield",
 };
 
-const IMAGENES_CATEGORIAS: Record<string, string> = {
-  "Herramientas Eléctricas": "https://img.heroui.chat/image/tools?w=400&h=300&u=2",
-  "Herramientas Manuales": "https://img.heroui.chat/image/tools?w=400&h=300&u=3",
-  "Materiales Eléctricos": "https://img.heroui.chat/image/tools?w=400&h=300&u=4",
-  "Fijación y Tornillería": "https://img.heroui.chat/image/tools?w=400&h=300&u=5",
-  "Jardín y Exteriores": "https://img.heroui.chat/image/landscape?w=400&h=300&u=1",
-  "Pinturas y Adhesivos": "https://img.heroui.chat/image/paint?w=400&h=300&u=1",
-  "Ferretería General": "https://img.heroui.chat/image/tools?w=400&h=300&u=6",
-  "Seguridad Industrial": "https://img.heroui.chat/image/helmet?w=400&h=300&u=1",
-};
-
 const CategoryCard: React.FC<{
   nombre: string;
   icon: string;
-  image: string;
+  image?: string | null;
   onClick: () => void;
 }> = ({ nombre, icon, image, onClick }) => (
   <Card className="w-full h-full" isPressable disableRipple onClick={onClick}>
     <CardBody className="overflow-hidden p-0">
-      <div className="relative h-48 overflow-hidden">
+      <div className="relative h-48 overflow-hidden flex items-center justify-center bg-default-100">
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent z-10"></div>
-        <img
-          src={image}
-          alt={nombre}
-          className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
-        />
+        {image ? (
+          <img
+            src={image}
+            alt={nombre}
+            className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Icon icon={icon} className="text-default-400" style={{ fontSize: 64 }} />
+          </div>
+        )}
         <div className="absolute bottom-0 left-0 p-4 z-20 w-full">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -69,9 +64,9 @@ const CategoryCard: React.FC<{
   </Card>
 );
 
-export const FeaturedCategories: React.FC = () => {
+// Cambia aquí: recibe navigateTo como prop
+export const FeaturedCategories: React.FC<{ navigateTo?: (page: string, categoria?: string) => void }> = ({ navigateTo }) => {
   const [categorias, setCategorias] = React.useState<Categoria[]>([]);
-  const navigate = useNavigate();
 
   React.useEffect(() => {
     fetch("http://localhost:8000/api/categorias/")
@@ -87,7 +82,7 @@ export const FeaturedCategories: React.FC = () => {
           variant="light"
           color="primary"
           endContent={<Icon icon="lucide:arrow-right" />}
-          onClick={() => navigate("/catalogo")}
+          onClick={() => navigateTo && navigateTo("catalogo")}
         >
           Ver todas
         </Button>
@@ -98,8 +93,14 @@ export const FeaturedCategories: React.FC = () => {
             key={cat.id}
             nombre={cat.nombre}
             icon={ICONOS_CATEGORIAS[cat.nombre] || "lucide:package"}
-            image={IMAGENES_CATEGORIAS[cat.nombre] || "https://img.heroui.chat/image/tools?w=400&h=300&u=99"}
-            onClick={() => navigate(`/catalogo?categoria=${encodeURIComponent(cat.nombre)}`)}
+            image={
+              cat.imagen_principal && cat.imagen_principal.trim() !== ""
+                ? (cat.imagen_principal.startsWith("http")
+                  ? cat.imagen_principal
+                  : `http://localhost:8000${cat.imagen_principal}`)
+                : null
+            }
+            onClick={() => navigateTo && navigateTo("catalogo", cat.nombre)}
           />
         ))}
       </div>

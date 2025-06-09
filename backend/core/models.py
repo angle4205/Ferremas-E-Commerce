@@ -11,6 +11,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
+from django.utils import timezone
 
 # --------------------------
 # ROLES DE USUARIO
@@ -93,6 +94,33 @@ class Marca(models.Model):
         return self.nombre
 
 # --------------------------
+# HISTORIAL DE TURNOS DE EMPLEADOS
+# --------------------------
+
+class TurnoEmpleado(models.Model):
+    """
+    Historial de turnos de cada empleado.
+    """
+    empleado = models.ForeignKey('UserProfile', on_delete=models.CASCADE, related_name="turnos")
+    entrada = models.DateTimeField()
+    salida = models.DateTimeField(null=True, blank=True)
+    comprobante_entrada = models.FileField(upload_to="comprobantes_empleado/", blank=True, null=True)
+
+    class Meta:
+        verbose_name = _("Turno de empleado")
+        verbose_name_plural = _("Turnos de empleados")
+        ordering = ["-entrada"]
+
+    def duracion_horas(self):
+        if self.entrada and self.salida:
+            delta = self.salida - self.entrada
+            return round(delta.total_seconds() / 3600, 2)
+        return None
+
+    def __str__(self):
+        return f"Turno de {self.empleado.user.username} ({self.entrada} - {self.salida or 'En curso'})"
+
+# --------------------------
 # USERPROFILE (EMPLEADO GENERALIZADO CON SUBROLES)
 # --------------------------
 
@@ -140,24 +168,33 @@ class UserProfile(models.Model):
     # Métodos de turnos (para todos los empleados)
     def marcar_entrada(self, comprobante=None):
         """
-        Marca la entrada a turno para cualquier empleado.
+        Marca la entrada a turno para cualquier empleado y registra en historial.
         """
-        from django.utils import timezone
         self.en_turno = True
         self.hora_entrada = timezone.now()
         if comprobante:
             self.comprobante_entrada = comprobante
         self.save()
+        # Registrar en historial
+        TurnoEmpleado.objects.create(
+            empleado=self,
+            entrada=self.hora_entrada,
+            comprobante_entrada=self.comprobante_entrada if self.comprobante_entrada else None
+        )
         enviar_email_confirmacion_turno_empleado(self)
 
     def marcar_salida(self):
         """
-        Marca la salida de turno para cualquier empleado.
+        Marca la salida de turno para cualquier empleado y actualiza el último turno abierto.
         """
-        from django.utils import timezone
         self.en_turno = False
         self.hora_salida = timezone.now()
         self.save()
+        # Actualizar el último turno abierto
+        ultimo_turno = self.turnos.filter(salida__isnull=True).order_by('-entrada').first()
+        if ultimo_turno:
+            ultimo_turno.salida = self.hora_salida
+            ultimo_turno.save()
         enviar_email_salida_turno_empleado(self)
 
     # Funcionalidad específica según subrol

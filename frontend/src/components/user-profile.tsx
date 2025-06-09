@@ -2,7 +2,7 @@ import React from "react";
 import { Button, Avatar, Divider, Chip } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { Error404 } from "./error-404";
-import getCookie from "../App";
+import { getCookie } from "../utils/cookies"; // Asegúrate de importar desde utils
 
 type Direccion = {
   id: number;
@@ -27,12 +27,13 @@ type PerfilUsuario = {
   foto_url?: string | null;
 };
 
+const ROLES_ADMIN = ["ADMINISTRADOR", "EMPLEADO", "BODEGUERO", "CONTADOR"];
+
 export const UserProfile: React.FC<{
   perfil?: PerfilUsuario;
   onGoDashboard?: () => void;
   onLogout?: () => void;
 }> = ({ perfil, onGoDashboard, onLogout }) => {
-  const [showDashboardPlaceholder, setShowDashboardPlaceholder] = React.useState(false);
   const [loggingOut, setLoggingOut] = React.useState(false);
 
   if (!perfil) {
@@ -40,12 +41,6 @@ export const UserProfile: React.FC<{
       <div className="flex justify-center items-center min-h-[40vh]">
         <span className="text-danger-500">No se pudo cargar el perfil.</span>
       </div>
-    );
-  }
-
-  if (showDashboardPlaceholder) {
-    return (
-      <Error404 onGoHome={() => setShowDashboardPlaceholder(false)} />
     );
   }
 
@@ -58,13 +53,14 @@ export const UserProfile: React.FC<{
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
+          "X-CSRFToken": getCookie("csrftoken"),
         },
       });
-      if (onLogout) onLogout();
     } catch (e) {
       // Puedes mostrar un error si quieres
     } finally {
       setLoggingOut(false);
+      if (onLogout) onLogout(); // <-- Llama siempre aquí
     }
   };
 
@@ -143,13 +139,12 @@ export const UserProfile: React.FC<{
           </ul>
         </div>
       </div>
-      {(perfil.rol === "ADMINISTRADOR" || perfil.rol === "EMPLEADO") && (
+      {ROLES_ADMIN.includes(perfil.rol?.toUpperCase() || "") && (
         <div className="flex justify-end mt-10">
           <Button
             color="primary"
             startContent={<Icon icon="lucide:layout-dashboard" />}
-            // TODO: Reemplazar esto por la navegación real al dashboard cuando esté implementado
-            onClick={() => setShowDashboardPlaceholder(true)}
+            onClick={onGoDashboard}
           >
             Ir al dashboard
           </Button>
