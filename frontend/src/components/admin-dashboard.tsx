@@ -19,6 +19,7 @@ interface AdminDashboardProps {
   perfil: PerfilUsuario | null;
   onProfile: () => void;
   onLogout: () => void;
+  onHome: () => void; // Nueva función para volver al inicio
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
@@ -27,35 +28,39 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   perfil,
   onProfile,
   onLogout,
+  onHome, // Se recibe la función como prop
 }) => {
   const [collapsed, setCollapsed] = React.useState(false);
 
   return (
-    <div className="flex h-screen bg-background">
-      <Sidebar collapsed={collapsed} onToggleCollapse={() => setCollapsed(!collapsed)} />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <DashboardHeader
-          collapsed={collapsed}
-          darkMode={darkMode}
-          setDarkMode={setDarkMode}
-          perfil={perfil}
-          onProfile={onProfile}
-          onLogout={onLogout}
-        />
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-[1400px] mx-auto space-y-6">
-            <DashboardOverview />
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2">
-                <SalesChart />
+    <div className={`flex flex-col h-screen w-full ${darkMode ? "dark" : ""}`}>
+      <div className="flex flex-1 bg-background dark:bg-background-dark overflow-hidden">
+        <Sidebar collapsed={collapsed} onToggleCollapse={() => setCollapsed(!collapsed)} />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <DashboardHeader
+            collapsed={collapsed}
+            darkMode={darkMode}
+            setDarkMode={setDarkMode}
+            perfil={perfil}
+            onProfile={onProfile}
+            onLogout={onLogout}
+            onHome={onHome} // Se pasa la función al header
+          />
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="max-w-[1400px] mx-auto space-y-6">
+              <DashboardOverview />
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2">
+                  <SalesChart />
+                </div>
               </div>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2">
-                <RecentOrders />
-              </div>
-              <div>
-                <InventoryStatus />
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2">
+                  <RecentOrders />
+                </div>
+                <div>
+                  <InventoryStatus />
+                </div>
               </div>
             </div>
           </div>

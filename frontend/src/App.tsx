@@ -116,20 +116,23 @@ export default function App() {
   const isDashboard = currentPage === "dashboard";
 
   if (isDashboard) {
-    return <AdminDashboard
-      darkMode={darkMode}
-      setDarkMode={setDarkMode}
-      perfil={perfil}
-      onProfile={() => {
-        setCurrentPage("inicio");
-        setAuthPage("profile");
-      }}
-      onLogout={() => {
-        setPerfil(null);
-        setCurrentPage("inicio");
-        setAuthPage("login");
-      }}
-    />;
+    return (
+      <AdminDashboard
+        darkMode={darkMode}
+        setDarkMode={setDarkMode}
+        perfil={perfil}
+        onProfile={() => {
+          setCurrentPage("inicio");
+          setAuthPage("profile");
+        }}
+        onLogout={() => {
+          setPerfil(null);
+          setCurrentPage("inicio");
+          setAuthPage("login");
+        }}
+        onHome={() => navigateTo("inicio")} // Redirige al inicio
+      />
+    );
   }
 
   return (

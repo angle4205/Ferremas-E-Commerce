@@ -13,6 +13,7 @@ interface DashboardHeaderProps {
   } | null;
   onProfile: () => void;
   onLogout: () => void;
+  onHome: () => void; // Nueva función para ir al inicio
 }
 
 export const DashboardHeader = ({
@@ -22,6 +23,7 @@ export const DashboardHeader = ({
   perfil,
   onProfile,
   onLogout,
+  onHome, // Se recibe la función como prop
 }: DashboardHeaderProps) => {
   return (
     <header className="h-16 border-b border-divider bg-content1 flex items-center px-4 lg:px-6">
@@ -38,6 +40,15 @@ export const DashboardHeader = ({
         />
       </div>
       <div className="flex items-center gap-4">
+        <Button
+          size="sm"
+          color="primary"
+          onClick={onHome} // Botón para ir al inicio
+          className="flex items-center gap-2"
+        >
+          <Icon icon="lucide:home" width={18} height={18} />
+          Inicio
+        </Button>
         <Switch
           size="sm"
           color="primary"
