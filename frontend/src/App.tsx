@@ -374,7 +374,7 @@ export default function App() {
               )
             ) : currentPage === "inicio" ? (
                 <>
-                  <HeroSection />
+                  <HeroSection onVerCatalogo={() => navigateTo("catalogo")}/>
                   <FeaturedCategories navigateTo={navigateTo} />
                   <PopularProducts navigateTo={navigateTo} />
                   <PromoBanner />

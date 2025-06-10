@@ -40,7 +40,7 @@ const ProductCard: React.FC<{ producto: Producto }> = ({ producto }) => {
   }
 
   return (
-    <Card className="w-full" isPressable disableRipple>
+    <Card className="max-w-sm w-full mx-auto" isPressable disableRipple>
       <CardBody className="p-0 overflow-hidden">
         <div className="relative w-full aspect-square bg-white flex items-center justify-center" style={{ minHeight: 0, height: 0, paddingBottom: "100%" }}>
           {producto.isNew && (
@@ -160,7 +160,8 @@ const PopularProducts: React.FC<{ navigateTo?: (page: string, categoria?: string
           Ver todos
         </Button>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+      <div className="grid gap-6 justify-center"
+           style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
         {productosPopulares.map((producto) => (
           <ProductCard key={producto.id} producto={producto} />
         ))}
