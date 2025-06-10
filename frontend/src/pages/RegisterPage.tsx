@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Input, Button, Card } from "@heroui/react";
 import { getCookie } from "../utils/cookies";
 
-export const RegisterForm: React.FC<{
+const RegisterPage: React.FC<{
   onRegisterSuccess?: () => void;
   onShowLogin?: () => void;
 }> = ({ onRegisterSuccess, onShowLogin }) => {
@@ -94,3 +94,5 @@ export const RegisterForm: React.FC<{
     </div>
   );
 };
+
+export default RegisterPage;

@@ -20,12 +20,14 @@ const ICONOS_CATEGORIAS: Record<string, string> = {
   "Seguridad Industrial": "lucide:shield",
 };
 
-const CategoryCard: React.FC<{
+interface CategoryCardProps {
   nombre: string;
   icon: string;
   image?: string | null;
   onClick: () => void;
-}> = ({ nombre, icon, image, onClick }) => (
+}
+
+const CategoryCard: React.FC<CategoryCardProps> = ({ nombre, icon, image, onClick }) => (
   <Card className="w-full h-full" isPressable disableRipple onClick={onClick}>
     <CardBody className="overflow-hidden p-0">
       <div className="relative h-48 overflow-hidden flex items-center justify-center bg-default-100">
@@ -64,8 +66,7 @@ const CategoryCard: React.FC<{
   </Card>
 );
 
-// Cambia aquí: recibe navigateTo como prop
-export const FeaturedCategories: React.FC<{ navigateTo?: (page: string, categoria?: string) => void }> = ({ navigateTo }) => {
+const FeaturedCategories: React.FC<{ navigateTo?: (page: string, categoria?: string) => void }> = ({ navigateTo }) => {
   const [categorias, setCategorias] = React.useState<Categoria[]>([]);
 
   React.useEffect(() => {
@@ -107,3 +108,5 @@ export const FeaturedCategories: React.FC<{ navigateTo?: (page: string, categori
     </section>
   );
 };
+
+export default FeaturedCategories;

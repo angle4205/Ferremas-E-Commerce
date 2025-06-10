@@ -14,32 +14,29 @@ interface NavItemProps {
   onClick: () => void;
 }
 
-const NavItem = ({ icon, label, active = false, onClick }: NavItemProps) => {
-  return (
-    <Button
-      className="justify-start h-12"
-      color={active ? "primary" : "default"}
-      variant="flat"
-      startContent={<Icon icon={icon} width={20} height={20} />}
-      fullWidth
-      onClick={onClick}
-    >
-      <span>{label}</span>
-    </Button>
-  );
-};
+const NavItem: React.FC<NavItemProps> = ({ icon, label, active = false, onClick }) => (
+  <Button
+    className="justify-start h-12"
+    color={active ? "primary" : "default"}
+    variant="flat"
+    startContent={<Icon icon={icon} width={20} height={20} />}
+    fullWidth
+    onClick={onClick}
+  >
+    <span>{label}</span>
+  </Button>
+);
 
-export const Sidebar = ({ rol, onNavigate }: SidebarProps) => {
+const Sidebar: React.FC<SidebarProps> = ({ rol, onNavigate }) => {
+  // Puedes agregar lógica para mostrar/ocultar ítems según el rol si lo necesitas
   return (
-    <div className="bg-content1 border-r border-divider flex flex-col w-[240px]">
+    <aside className="bg-content1 border-r border-divider flex flex-col w-[240px]">
       <div className="flex items-center h-16 px-4 border-b border-divider">
-        <div className="flex items-center gap-2 flex-1">
-          <Icon icon="lucide:tool" width={24} height={24} className="text-primary" />
-          <span className="font-semibold text-lg">Gestión FERREMAS</span>
-        </div>
+        <Icon icon="lucide:tool" width={24} height={24} className="text-primary" />
+        <span className="font-semibold text-lg ml-2">Gestión FERREMAS</span>
       </div>
 
-      <div className="flex flex-col p-2 gap-1 flex-1">
+      <nav className="flex flex-col p-2 gap-1 flex-1">
         {/* Pestañas principales */}
         <NavItem icon="lucide:layout-dashboard" label="Resumen General" onClick={() => onNavigate("dashboard")} />
         <NavItem icon="lucide:shopping-bag" label="Órdenes" onClick={() => onNavigate("orders")} />
@@ -52,7 +49,7 @@ export const Sidebar = ({ rol, onNavigate }: SidebarProps) => {
 
         {/* Pestañas adicionales */}
         <NavItem icon="lucide:shield" label="Auditoría" onClick={() => onNavigate("audit")} />
-      </div>
+      </nav>
 
       <div className="p-2 border-t border-divider">
         <Button
@@ -65,6 +62,8 @@ export const Sidebar = ({ rol, onNavigate }: SidebarProps) => {
           Cerrar Sesión
         </Button>
       </div>
-    </div>
+    </aside>
   );
 };
+
+export default Sidebar;

@@ -41,6 +41,7 @@ from .views import (
     CartAPIView, 
     CartItemUpdateAPIView, 
     CartItemDeleteAPIView,
+    CartItemCreateAPIView,
 )
 from django.conf import settings
 from django.conf.urls.static import static
@@ -51,18 +52,18 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', LandingView.as_view(), name='landing'),
 
+    # CSRF Token para peticiones AJAX
+    path('api/csrf/', CSRFTokenView.as_view(), name='api-csrf'),
+
     # API Autenticación
     path('api/auth/login/', LoginAPIView.as_view(), name='api-login'),
     path('api/auth/logout/', LogoutAPIView.as_view(), name='api-logout'),
     path('api/auth/register/', RegisterAPIView.as_view(), name='api-register'),
     
-    # CSRF Token para peticiones AJAX
-    path('api/csrf/', CSRFTokenView.as_view(), name='api-csrf'),
-    
     # API Usuario
     path('api/usuario/perfil/', PerfilUsuarioAPIView.as_view(), name='usuario-perfil'),
 
-    # API Productos
+    # API Productos y Categorías
     path('api/productos/', ProductoListAPIView.as_view(), name='productos-list'),
     path("api/categorias/", CategoriaListAPIView.as_view()),
 
@@ -70,18 +71,19 @@ urlpatterns = [
     path("api/cart/", CartAPIView.as_view(), name="cart"),
     path("api/cart/items/<int:item_id>/", CartItemUpdateAPIView.as_view(), name="cart-item-update"),
     path("api/cart/items/<int:item_id>/delete/", CartItemDeleteAPIView.as_view(), name="cart-item-delete"),
+    path("api/cart/items/", CartItemCreateAPIView.as_view(), name="cart-item-create"),
 
-    # API Empleados - Turnos y perfil
+    # API Empleados
     path('api/empleados/marcar_entrada/', MarcarEntradaAPIView.as_view(), name='empleado-marcar-entrada'),
     path('api/empleados/marcar_salida/', MarcarSalidaAPIView.as_view(), name='empleado-marcar-salida'),
     path('api/empleados/perfil/', PerfilEmpleadoAPIView.as_view(), name='empleado-perfil'),
     path('api/empleados/historial_turnos/', TurnoHistorialAPIView.as_view(), name='empleado-historial-turnos'),
 
-    # API Bodeguero - Pedidos asignados
+    # API Bodeguero 
     path('api/bodeguero/ordenes/', BodegueroOrdenesAPIView.as_view(), name='bodeguero-ordenes'),
     path('api/bodeguero/ordenes/<int:pedido_id>/', BodegueroOrdenEstadoAPIView.as_view(), name='bodeguero-orden-estado'),
 
-    # API Contador - Reportes
+    # API Contador 
     path('api/contador/reportes/', ContadorReportesAPIView.as_view(), name='contador-reportes'),
 
     # API Admin

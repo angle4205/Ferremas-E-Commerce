@@ -17,10 +17,9 @@ interface Producto {
 
 const API_URL = "http://localhost:8000";
 
-const renderStars = (rating: number = 0) => {
-  const stars = [];
-  for (let i = 1; i <= 5; i++) {
-    stars.push(
+const renderStars = (rating: number = 0) => (
+  <div className="flex items-center gap-0.5">
+    {[1, 2, 3, 4, 5].map(i => (
       <Icon
         key={i}
         icon={i <= Math.round(rating) ? "lucide:star" : "lucide:star-off"}
@@ -28,14 +27,13 @@ const renderStars = (rating: number = 0) => {
         width={18}
         height={18}
       />
-    );
-  }
-  return <div className="flex items-center gap-0.5">{stars}</div>;
-};
+    ))}
+  </div>
+);
 
 const ProductCard: React.FC<{ producto: Producto }> = ({ producto }) => {
   let imagenUrl: string | null = null;
-  if (producto.imagen_principal && typeof producto.imagen_principal === "string" && producto.imagen_principal.trim() !== "") {
+  if (producto.imagen_principal && producto.imagen_principal.trim() !== "") {
     imagenUrl = producto.imagen_principal.startsWith("http")
       ? producto.imagen_principal
       : `${API_URL}${producto.imagen_principal}`;
@@ -103,7 +101,7 @@ const ProductCard: React.FC<{ producto: Producto }> = ({ producto }) => {
           fullWidth
           color="primary"
           variant="flat"
-          startContent={<Icon icon="lucide:shopping-cart" size={18} />}
+          startContent={<Icon icon="lucide:shopping-cart" width={18} height={18} />}
         >
           Agregar al carrito
         </Button>
@@ -112,7 +110,7 @@ const ProductCard: React.FC<{ producto: Producto }> = ({ producto }) => {
   );
 };
 
-export const PopularProducts: React.FC<{ navigateTo?: (page: string, categoria?: string) => void }> = ({ navigateTo }) => {
+const PopularProducts: React.FC<{ navigateTo?: (page: string, categoria?: string) => void }> = ({ navigateTo }) => {
   const [productos, setProductos] = React.useState<Producto[]>([]);
   const [cargando, setCargando] = React.useState(true);
 
@@ -141,9 +139,13 @@ export const PopularProducts: React.FC<{ navigateTo?: (page: string, categoria?:
   }, []);
 
   // Ordenar por rating descendente y tomar los 4 mejores
-  const productosPopulares = [...productos]
-    .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
-    .slice(0, 4);
+  const productosPopulares = React.useMemo(
+    () =>
+      [...productos]
+        .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
+        .slice(0, 4),
+    [productos]
+  );
 
   return (
     <section className="mb-16">
@@ -167,3 +169,5 @@ export const PopularProducts: React.FC<{ navigateTo?: (page: string, categoria?:
     </section>
   );
 };
+
+export default PopularProducts;

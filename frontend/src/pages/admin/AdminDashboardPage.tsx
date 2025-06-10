@@ -1,11 +1,12 @@
 import React from "react";
-import { Sidebar } from "./admin-components/sidebar";
-import { DashboardHeader } from "./admin-components/dashboard-header";
-import { DashboardOverview } from "./admin-components/dashboard-overview";
-import { Orders } from "./admin-components/orders"; // Importamos el componente de Órdenes
-import { SalesChart } from "./admin-components/sales-chart";
-import { RecentOrders } from "./admin-components/recent-orders";
-import { InventoryStatus } from "./admin-components/inventory-status";
+import Sidebar from "../../components/admin/Sidebar";
+import DashboardHeader from "../../components/admin/DashboardHeader";
+import DashboardOverview from "../../components/admin/DashboardOverview";
+import OrdersTable from "../../components/admin/OrdersTable";
+import SalesChart from "../../components/admin/SalesChart";
+import RecentOrders from "../../components/admin/RecentOrders";
+import InventoryStatus from "../../components/admin/InventoryStatus";
+import { Spinner } from "@heroui/react";
 
 type PerfilUsuario = {
   username: string;
@@ -13,7 +14,7 @@ type PerfilUsuario = {
   foto_url?: string | null;
 };
 
-interface AdminDashboardProps {
+interface AdminDashboardPageProps {
   darkMode: boolean;
   setDarkMode: (val: boolean) => void;
   perfil: PerfilUsuario | null;
@@ -22,7 +23,7 @@ interface AdminDashboardProps {
   onHome: () => void;
 }
 
-export const AdminDashboard: React.FC<AdminDashboardProps> = ({
+const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
   darkMode,
   setDarkMode,
   perfil,
@@ -31,9 +32,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onHome,
 }) => {
   const [collapsed, setCollapsed] = React.useState(false);
-  const [currentPage, setCurrentPage] = React.useState("dashboard"); // Estado para manejar la página actual
+  const [currentPage, setCurrentPage] = React.useState("dashboard");
 
-  // Función para renderizar el contenido según la página seleccionada
   const renderContent = () => {
     switch (currentPage) {
       case "dashboard":
@@ -56,7 +56,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </>
         );
       case "orders":
-        return <Orders />; // Renderizamos el componente de Órdenes
+        return <OrdersTable />;
       default:
         return <DashboardOverview />;
     }
@@ -65,11 +65,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   return (
     <div className={`flex flex-col h-screen w-full ${darkMode ? "dark" : ""}`}>
       <div className="flex flex-1 bg-background dark:bg-background-dark overflow-hidden">
-        <Sidebar
-          collapsed={collapsed}
-          onToggleCollapse={() => setCollapsed(!collapsed)}
-          onNavigate={setCurrentPage} // Pasamos la función para cambiar de página
-        />
+        <Sidebar onNavigate={setCurrentPage} rol="" />
         <div className="flex-1 flex flex-col overflow-hidden">
           <DashboardHeader
             collapsed={collapsed}
@@ -81,7 +77,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             onHome={onHome}
           />
           <div className="flex-1 overflow-y-auto p-6">
-            <div className="max-w-[1400px] mx-auto space-y-6">{renderContent()}</div>
+            <div className="max-w-[1400px] mx-auto space-y-6">
+              {perfil ? (
+                renderContent()
+              ) : (
+                <div className="flex justify-center items-center min-h-screen">
+                  <Spinner size="lg" />
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -89,4 +93,4 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   );
 };
 
-export default AdminDashboard;
+export default AdminDashboardPage;

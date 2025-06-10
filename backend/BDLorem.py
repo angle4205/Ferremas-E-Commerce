@@ -22,6 +22,9 @@ from core.models import (
     Rol,
 )
 
+# Este script está diseñado para ejecutarse de forma independiente y poblar la base de datos con datos de demostración.
+# No debe ser importado como un módulo en otras partes de la aplicación.
+
 def clear_all():
     # Borra en orden seguro (hijos primero)
     Pago.objects.all().delete()

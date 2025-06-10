@@ -10,24 +10,21 @@ import {
   YAxis
 } from "recharts";
 
-// Define los tipos de datos del gráfico
 type ChartData = {
   name: string;
   revenue: number;
   orders: number;
 };
 
-// Función para formatear moneda
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('es-CL', {
-    style: 'currency',
-    currency: 'CLP',
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat("es-CL", {
+    style: "currency",
+    currency: "CLP",
     minimumFractionDigits: 0,
-    maximumFractionDigits: 0
+    maximumFractionDigits: 0,
   }).format(value);
-};
 
-export const SalesChart = () => {
+const SalesChart: React.FC = () => {
   const [selected, setSelected] = React.useState<"weekly" | "monthly">("weekly");
   const [data, setData] = React.useState<ChartData[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -92,8 +89,8 @@ export const SalesChart = () => {
         <div className="flex-1">
           <h3 className="text-lg font-semibold">Resumen de Ventas</h3>
         </div>
-        <Tabs 
-          selectedKey={selected} 
+        <Tabs
+          selectedKey={selected}
           onSelectionChange={(key) => setSelected(key as "weekly" | "monthly")}
           size="sm"
           color="primary"
@@ -126,13 +123,13 @@ export const SalesChart = () => {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--heroui-divider))" />
-              <XAxis 
-                dataKey="name" 
+              <XAxis
+                dataKey="name"
                 axisLine={false}
                 tickLine={false}
                 tick={{ fontSize: 12, fill: 'hsl(var(--heroui-foreground-500))' }}
               />
-              <YAxis 
+              <YAxis
                 axisLine={false}
                 tickLine={false}
                 tick={{ fontSize: 12, fill: 'hsl(var(--heroui-foreground-500))' }}
@@ -182,3 +179,5 @@ export const SalesChart = () => {
     </Card>
   );
 };
+
+export default SalesChart;

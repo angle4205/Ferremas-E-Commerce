@@ -90,19 +90,11 @@ class PedidoDetailSerializer(serializers.ModelSerializer):
 # --- ItemCarritoSerializer (para items en el carrito de compras) ---
 
 class ItemCarritoSerializer(serializers.ModelSerializer):
-    product = serializers.SerializerMethodField()
+    producto = ProductoSerializer(read_only=True)
 
     class Meta:
         model = ItemCarrito
-        fields = ["id", "product", "cantidad", "precio_unitario", "subtotal"]
-
-    def get_product(self, obj):
-        return {
-            "id": obj.producto.id,
-            "name": obj.producto.nombre,
-            "price": obj.producto.valor,
-            "image": obj.producto.imagen_principal.url if obj.producto.imagen_principal else None,
-        }
+        fields = ["id", "producto", "cantidad", "precio_unitario", "subtotal"]
 
 # --- UserProfileSerializer (perfil de usuario extendido) ---
 

@@ -13,9 +13,6 @@ import {
   Button,
   Pagination,
   Spinner,
-  Input,
-  Select,
-  SelectItem,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
 
@@ -49,22 +46,19 @@ const statusLabelMap: Record<PedidoStatus, string> = {
   LISTO_RETIRO: "Listo para retiro",
 };
 
-function formatoCLP(valor: number) {
-  return valor.toLocaleString("es-CL", { style: "currency", currency: "CLP", minimumFractionDigits: 0 });
-}
+const formatoCLP = (valor: number) =>
+  valor.toLocaleString("es-CL", { style: "currency", currency: "CLP", minimumFractionDigits: 0 });
 
-export const Orders = () => {
+const RecentOrders: React.FC = () => {
   const [pedidos, setPedidos] = React.useState<Pedido[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [page, setPage] = React.useState(1);
-  const [search, setSearch] = React.useState("");
-  const [statusFilter, setStatusFilter] = React.useState<PedidoStatus | "">("");
-  const rowsPerPage = 10;
+  const rowsPerPage = 5;
 
   React.useEffect(() => {
     setLoading(true);
     fetch("http://localhost:8000/api/admin/orders/", { credentials: "include" })
-      .then(async (res) => {
+      .then(async res => {
         if (!res.ok) throw new Error("No se pudo cargar las órdenes");
         return res.json();
       })
@@ -85,63 +79,30 @@ export const Orders = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  const filteredPedidos = pedidos.filter((pedido) => {
-    // Convertir a minúsculas para hacer la búsqueda insensible a mayúsculas
-    const searchLower = search.toLowerCase();
-    const clienteLower = pedido.cliente_nombre.toLowerCase();
-    const codigoLower = pedido.codigo.toLowerCase();
-
-    // Verificar si coincide con la búsqueda
-    const matchesSearch =
-      search === "" || clienteLower.includes(searchLower) || codigoLower.includes(searchLower);
-
-    // Verificar si coincide con el filtro de estado
-    const matchesStatus = statusFilter === "" || pedido.estado === statusFilter;
-
-    return matchesSearch && matchesStatus;
-  });
-
-  const paginated = filteredPedidos.slice((page - 1) * rowsPerPage, page * rowsPerPage);
+  const paginated = pedidos.slice((page - 1) * rowsPerPage, page * rowsPerPage);
 
   return (
     <Card>
-      <CardHeader className="flex flex-col sm:flex-row justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Input
-            placeholder="Buscar por código o cliente..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            size="sm"
-            startContent={<Icon icon="lucide:search" width={16} height={16} />}
-          />
-          <Select
-            placeholder="Filtrar por estado"
-            value={statusFilter}
-            onChange={(value) => setStatusFilter(value as PedidoStatus | "")}
-            size="sm"
-          >
-            <SelectItem key="" value="">
-              Todos
-            </SelectItem>
-            {Object.entries(statusLabelMap).map(([key, label]) => (
-              <SelectItem key={key} value={key}>
-                {label}
-              </SelectItem>
-            ))}
-          </Select>
-        </div>
+      <CardHeader className="flex justify-between">
+        <h3 className="text-lg font-semibold">Órdenes recientes</h3>
+        <Button
+          color="primary"
+          variant="flat"
+          size="sm"
+          endContent={<Icon icon="lucide:arrow-right" width={16} height={16} />}
+        >
+          Ver todas
+        </Button>
       </CardHeader>
       <CardBody>
         {loading ? (
-          <div className="flex justify-center py-8">
-            <Spinner size="lg" />
-          </div>
-        ) : filteredPedidos.length === 0 ? (
-          <div className="text-center text-danger-500 py-8">No hay órdenes disponibles.</div>
+          <div className="flex justify-center py-8"><Spinner size="lg" /></div>
+        ) : pedidos.length === 0 ? (
+          <div className="text-center text-danger-500 py-8">No hay órdenes recientes.</div>
         ) : (
           <Table
             removeWrapper
-            aria-label="Orders table"
+            aria-label="Recent orders table"
             bottomContent={
               <div className="flex w-full justify-center">
                 <Pagination
@@ -150,7 +111,7 @@ export const Orders = () => {
                   showShadow
                   color="primary"
                   page={page}
-                  total={Math.ceil(filteredPedidos.length / rowsPerPage)}
+                  total={Math.ceil(pedidos.length / rowsPerPage)}
                   onChange={setPage}
                 />
               </div>
@@ -177,7 +138,11 @@ export const Orders = () => {
                   <TableCell>{pedido.fecha_creacion}</TableCell>
                   <TableCell>{formatoCLP(pedido.total)}</TableCell>
                   <TableCell>
-                    <Chip color={statusColorMap[pedido.estado]} size="sm" variant="flat">
+                    <Chip
+                      color={statusColorMap[pedido.estado]}
+                      size="sm"
+                      variant="flat"
+                    >
                       {statusLabelMap[pedido.estado]}
                     </Chip>
                   </TableCell>
@@ -200,3 +165,5 @@ export const Orders = () => {
     </Card>
   );
 };
+
+export default RecentOrders;

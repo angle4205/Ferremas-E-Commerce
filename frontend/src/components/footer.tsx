@@ -6,7 +6,7 @@ interface FooterProps {
   navigateTo?: (page: string) => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ navigateTo }) => {
+const Footer: React.FC<FooterProps> = ({ navigateTo }) => {
   return (
     <footer className="bg-content2 pt-12 pb-6">
       <div className="container mx-auto px-4">
@@ -23,19 +23,19 @@ export const Footer: React.FC<FooterProps> = ({ navigateTo }) => {
               para ofrecerte la mejor experiencia de compra.
             </p>
             <div className="flex gap-4">
-              <Button isIconOnly variant="flat" size="sm" radius="full" asChild>
+              <Button isIconOnly variant="flat" size="sm" radius="full">
                 <a href="#" aria-label="Facebook">
-                  <Icon icon="mdi:facebook" size={20} />
+                  <Icon icon="mdi:facebook" style={{ fontSize: 20 }} />
                 </a>
               </Button>
-              <Button isIconOnly variant="flat" size="sm" radius="full" asChild>
+              <Button isIconOnly variant="flat" size="sm" radius="full">
                 <a href="#" aria-label="Instagram">
-                  <Icon icon="mdi:instagram" size={20} />
+                  <Icon icon="mdi:instagram" style={{ fontSize: 20 }} />
                 </a>
               </Button>
-              <Button isIconOnly variant="flat" size="sm" radius="full" asChild>
+              <Button isIconOnly variant="flat" size="sm" radius="full">
                 <a href="#" aria-label="Twitter">
-                  <Icon icon="mdi:twitter" size={20} />
+                  <Icon icon="mdi:twitter" style={{ fontSize: 20 }} />
                 </a>
               </Button>
             </div>
@@ -50,7 +50,7 @@ export const Footer: React.FC<FooterProps> = ({ navigateTo }) => {
               </li>
               <li>
                 {navigateTo ? (
-                  <Link as="button" color="foreground" onClick={() => navigateTo("catalog")} className="cursor-pointer">
+                  <Link as="button" color="foreground" onClick={() => navigateTo("catalogo")} className="cursor-pointer">
                     Catálogo
                   </Link>
                 ) : (
@@ -103,3 +103,5 @@ export const Footer: React.FC<FooterProps> = ({ navigateTo }) => {
     </footer>
   );
 };
+
+export default Footer;

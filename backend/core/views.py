@@ -15,6 +15,7 @@ from .serializers import (
     PedidoSimpleSerializer,
     PedidoDetailSerializer,
     UserProfileSerializer,
+    ItemCarritoSerializer,
 )
 from django.utils import timezone
 from django.db import models
@@ -25,9 +26,6 @@ from django.utils.decorators import method_decorator
 from django.http import JsonResponse
 from django.db.models import Sum, Count
 from .models import Cart, ItemCarrito
-from .serializers import ItemCarritoSerializer
-from rest_framework.permissions import IsAuthenticated
-
 
 # --- Vistas de navegación ---
 
@@ -228,13 +226,42 @@ class CartAPIView(APIView):
     def get(self, request):
         # Obtener el carrito del usuario autenticado
         cart, _ = Cart.objects.get_or_create(user=request.user, estado="ACTIVO")
-        items = ItemCarrito.objects.filter(carrito=cart)
+        # Filtrar solo items cuyo producto existe y está disponible
+        items = ItemCarrito.objects.filter(carrito=cart, producto__isnull=False, producto__disponible=True)
         total = sum(item.subtotal() for item in items)
         return Response({
             "items": ItemCarritoSerializer(items, many=True).data,
             "total": total
         })
 
+class CartItemCreateAPIView(APIView):
+    """
+    Agrega un producto al carrito del usuario autenticado.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        producto_id = request.data.get("producto_id")
+        cantidad = request.data.get("cantidad", 1)
+        if not producto_id:
+            return Response({"error": "Falta el producto_id."}, status=400)
+        try:
+            producto = Producto.objects.get(id=producto_id, disponible=True)
+        except Producto.DoesNotExist:
+            return Response({"error": "Producto no encontrado o no disponible."}, status=404)
+        cart, _ = Cart.objects.get_or_create(user=request.user, estado="ACTIVO")
+        item, created = ItemCarrito.objects.get_or_create(
+            carrito=cart,
+            producto=producto,
+            defaults={"precio_unitario": producto.valor}
+        )
+        if not created:
+            item.cantidad += int(cantidad)
+        else:
+            item.cantidad = int(cantidad)
+            item.precio_unitario = producto.valor  # Asegura que siempre tenga precio
+        item.save()
+        return Response(ItemCarritoSerializer(item).data, status=201)
 
 class CartItemUpdateAPIView(APIView):
     """
@@ -245,7 +272,7 @@ class CartItemUpdateAPIView(APIView):
     def patch(self, request, item_id):
         try:
             item = ItemCarrito.objects.get(id=item_id, carrito__user=request.user, carrito__estado="ACTIVO")
-            cantidad = request.data.get("quantity")
+            cantidad = request.data.get("cantidad") or request.data.get("quantity")
             if not cantidad or int(cantidad) < 1:
                 return Response({"error": "La cantidad debe ser mayor a 0."}, status=status.HTTP_400_BAD_REQUEST)
             item.cantidad = int(cantidad)
@@ -253,7 +280,6 @@ class CartItemUpdateAPIView(APIView):
             return Response(ItemCarritoSerializer(item).data)
         except ItemCarrito.DoesNotExist:
             return Response({"error": "El item no existe o no pertenece al carrito activo."}, status=status.HTTP_404_NOT_FOUND)
-
 
 class CartItemDeleteAPIView(APIView):
     """

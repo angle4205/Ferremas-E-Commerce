@@ -13,6 +13,9 @@ import {
   Button,
   Pagination,
   Spinner,
+  Input,
+  Select,
+  SelectItem,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
 
@@ -46,25 +49,25 @@ const statusLabelMap: Record<PedidoStatus, string> = {
   LISTO_RETIRO: "Listo para retiro",
 };
 
-function formatoCLP(valor: number) {
-  return valor.toLocaleString("es-CL", { style: "currency", currency: "CLP", minimumFractionDigits: 0 });
-}
+const formatoCLP = (valor: number) =>
+  valor.toLocaleString("es-CL", { style: "currency", currency: "CLP", minimumFractionDigits: 0 });
 
-export const RecentOrders = () => {
+const OrdersTable: React.FC = () => {
   const [pedidos, setPedidos] = React.useState<Pedido[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [page, setPage] = React.useState(1);
-  const rowsPerPage = 5;
+  const [search, setSearch] = React.useState("");
+  const [statusFilter, setStatusFilter] = React.useState<PedidoStatus | "">("");
+  const rowsPerPage = 10;
 
   React.useEffect(() => {
     setLoading(true);
     fetch("http://localhost:8000/api/admin/orders/", { credentials: "include" })
-      .then(async res => {
+      .then(async (res) => {
         if (!res.ok) throw new Error("No se pudo cargar las órdenes");
         return res.json();
       })
       .then((data: any) => {
-        // Si la respuesta es paginada, usa data.results, si es lista directa, usa data
         const pedidosRaw = Array.isArray(data) ? data : data.results || [];
         const pedidos: Pedido[] = pedidosRaw.map((p: any) => ({
           id: p.id,
@@ -81,31 +84,60 @@ export const RecentOrders = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  // Paginación local
-  const paginated = pedidos.slice((page - 1) * rowsPerPage, page * rowsPerPage);
+  const filteredPedidos = pedidos.filter((pedido) => {
+    const searchLower = search.toLowerCase();
+    const clienteLower = pedido.cliente_nombre.toLowerCase();
+    const codigoLower = pedido.codigo.toLowerCase();
+
+    const matchesSearch =
+      search === "" || clienteLower.includes(searchLower) || codigoLower.includes(searchLower);
+
+    const matchesStatus = statusFilter === "" || pedido.estado === statusFilter;
+
+    return matchesSearch && matchesStatus;
+  });
+
+  const paginated = filteredPedidos.slice((page - 1) * rowsPerPage, page * rowsPerPage);
 
   return (
     <Card>
-      <CardHeader className="flex justify-between">
-        <h3 className="text-lg font-semibold">Órdenes recientes</h3>
-        <Button
-          color="primary"
-          variant="flat"
-          size="sm"
-          endContent={<Icon icon="lucide:arrow-right" width={16} height={16} />}
-        >
-          Ver todas
-        </Button>
+      <CardHeader className="flex flex-col sm:flex-row justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Input
+            placeholder="Buscar por código o cliente..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            size="sm"
+            startContent={<Icon icon="lucide:search" width={16} height={16} />}
+          />
+          <Select
+            selectedKeys={statusFilter ? [statusFilter] : []}
+            onSelectionChange={(keys) => {
+              const val = Array.from(keys)[0] as PedidoStatus | "";
+              setStatusFilter(val);
+            }}
+            size="sm"
+          >
+            <>
+              <SelectItem key="">Todos</SelectItem>
+              {Object.entries(statusLabelMap).map(([key, label]) => (
+                <SelectItem key={key}>{label}</SelectItem>
+              ))}
+            </>
+          </Select>
+        </div>
       </CardHeader>
       <CardBody>
         {loading ? (
-          <div className="flex justify-center py-8"><Spinner size="lg" /></div>
-        ) : pedidos.length === 0 ? (
-          <div className="text-center text-danger-500 py-8">No hay órdenes recientes.</div>
+          <div className="flex justify-center py-8">
+            <Spinner size="lg" />
+          </div>
+        ) : filteredPedidos.length === 0 ? (
+          <div className="text-center text-danger-500 py-8">No hay órdenes disponibles.</div>
         ) : (
           <Table
             removeWrapper
-            aria-label="Recent orders table"
+            aria-label="Orders table"
             bottomContent={
               <div className="flex w-full justify-center">
                 <Pagination
@@ -114,7 +146,7 @@ export const RecentOrders = () => {
                   showShadow
                   color="primary"
                   page={page}
-                  total={Math.ceil(pedidos.length / rowsPerPage)}
+                  total={Math.ceil(filteredPedidos.length / rowsPerPage)}
                   onChange={setPage}
                 />
               </div>
@@ -141,11 +173,7 @@ export const RecentOrders = () => {
                   <TableCell>{pedido.fecha_creacion}</TableCell>
                   <TableCell>{formatoCLP(pedido.total)}</TableCell>
                   <TableCell>
-                    <Chip
-                      color={statusColorMap[pedido.estado]}
-                      size="sm"
-                      variant="flat"
-                    >
+                    <Chip color={statusColorMap[pedido.estado]} size="sm" variant="flat">
                       {statusLabelMap[pedido.estado]}
                     </Chip>
                   </TableCell>
@@ -168,3 +196,5 @@ export const RecentOrders = () => {
     </Card>
   );
 };
+
+export default OrdersTable;

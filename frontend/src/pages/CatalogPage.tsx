@@ -1,4 +1,5 @@
 import React from "react";
+import { getCookie } from "../utils/cookies";
 import {
   Card,
   CardBody,
@@ -38,15 +39,16 @@ function formatoCLP(valor: number) {
   return valor.toLocaleString("es-CL", { style: "currency", currency: "CLP", minimumFractionDigits: 0 });
 }
 
-// Función para agregar un producto al carrito
 const agregarAlCarrito = async (productoId: number) => {
   try {
+    const csrftoken = getCookie("csrftoken");
     const response = await fetch(`http://localhost:8000/api/cart/items/`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "X-CSRFToken": csrftoken || "",
       },
-      credentials: "include", // Incluye cookies para autenticación
+      credentials: "include",
       body: JSON.stringify({ producto_id: productoId, cantidad: 1 }),
     });
 
@@ -54,11 +56,9 @@ const agregarAlCarrito = async (productoId: number) => {
       throw new Error("Error al agregar el producto al carrito");
     }
 
-    const data = await response.json();
-    console.log("Producto agregado al carrito:", data);
+    await response.json();
     alert("Producto agregado al carrito");
   } catch (error) {
-    console.error(error);
     alert("No se pudo agregar el producto al carrito. Inténtalo de nuevo.");
   }
 };
@@ -134,9 +134,9 @@ const TarjetaProducto: React.FC<{ producto: Producto }> = ({ producto }) => {
           fullWidth
           color="primary"
           variant="flat"
-          startContent={<Icon icon="lucide:shopping-cart" size={18} />}
+          startContent={<Icon icon="lucide:shopping-cart" width={18} height={18} />}
           disabled={!producto.disponible}
-          onClick={() => agregarAlCarrito(producto.id)} // Llama a la función al hacer clic
+          onClick={() => agregarAlCarrito(producto.id)}
         >
           Agregar al carrito
         </Button>
@@ -145,12 +145,10 @@ const TarjetaProducto: React.FC<{ producto: Producto }> = ({ producto }) => {
   );
 };
 
-// Cambia aquí: acepta categoriaInicial como prop
-export const CatalogPage: React.FC<{ categoriaInicial?: string | null }> = ({ categoriaInicial }) => {
+const CatalogPage: React.FC<{ categoriaInicial?: string | null }> = ({ categoriaInicial }) => {
   const [productos, setProductos] = React.useState<Producto[]>([]);
   const [cargando, setCargando] = React.useState(true);
 
-  // Usa categoriaInicial para el filtro inicial
   const [filtros, setFiltros] = React.useState<EstadoFiltros>({
     categoria: categoriaInicial || "todos",
     rangoPrecio: "todos",
@@ -160,7 +158,6 @@ export const CatalogPage: React.FC<{ categoriaInicial?: string | null }> = ({ ca
   const [paginaActual, setPaginaActual] = React.useState(1);
   const productosPorPagina = 12;
 
-  // Si cambia la prop, actualiza el filtro de categoría
   React.useEffect(() => {
     if (categoriaInicial && categoriaInicial !== filtros.categoria) {
       setFiltros(f => ({ ...f, categoria: categoriaInicial }));
@@ -190,7 +187,6 @@ export const CatalogPage: React.FC<{ categoriaInicial?: string | null }> = ({ ca
       });
   }, []);
 
-  // Extraer categorías únicas del catálogo para el filtro
   const categoriasUnicas = React.useMemo(() => {
     const cats = Array.from(new Set(productos.map(p => p.categoria).filter(Boolean)));
     return [{ key: "todos", label: "Todas las categorías" }, ...cats.map(c => ({ key: c, label: c }))];
@@ -221,7 +217,6 @@ export const CatalogPage: React.FC<{ categoriaInicial?: string | null }> = ({ ca
     setPaginaActual(1);
   };
 
-  // Filtrado y ordenamiento
   const productosFiltrados = React.useMemo(() => {
     let resultado = [...productos];
 
@@ -267,14 +262,12 @@ export const CatalogPage: React.FC<{ categoriaInicial?: string | null }> = ({ ca
         resultado.sort((a, b) => b.id - a.id);
         break;
       default:
-        // populares: podrías implementar lógica de popularidad si la tienes
         break;
     }
 
     return resultado;
   }, [filtros, productos]);
 
-  // Paginación
   const totalPaginas = Math.ceil(productosFiltrados.length / productosPorPagina);
   const productosActuales = productosFiltrados.slice(
     (paginaActual - 1) * productosPorPagina,
@@ -301,8 +294,8 @@ export const CatalogPage: React.FC<{ categoriaInicial?: string | null }> = ({ ca
             placeholder="Buscar productos..."
             value={filtros.busqueda}
             onChange={cambiarBusqueda}
-            startContent={<Icon icon="lucide:search" size={18} />}
-            clearable
+            startContent={<Icon icon="lucide:search" width={18} height={18} />}
+            isClearable
             className="w-full"
           />
         </div>
@@ -311,7 +304,7 @@ export const CatalogPage: React.FC<{ categoriaInicial?: string | null }> = ({ ca
             <DropdownTrigger>
               <Button
                 variant="flat"
-                endContent={<Icon icon="lucide:chevron-down" size={16} />}
+                endContent={<Icon icon="lucide:chevron-down" width={16} height={16} />}
               >
                 {categoriaActual}
               </Button>
@@ -334,7 +327,7 @@ export const CatalogPage: React.FC<{ categoriaInicial?: string | null }> = ({ ca
             <DropdownTrigger>
               <Button
                 variant="flat"
-                endContent={<Icon icon="lucide:chevron-down" size={16} />}
+                endContent={<Icon icon="lucide:chevron-down" width={16} height={16} />}
               >
                 {opcionesPrecio.find(p => p.key === filtros.rangoPrecio)?.label || "Todos los precios"}
               </Button>
@@ -357,7 +350,7 @@ export const CatalogPage: React.FC<{ categoriaInicial?: string | null }> = ({ ca
             <DropdownTrigger>
               <Button
                 variant="flat"
-                endContent={<Icon icon="lucide:chevron-down" size={16} />}
+                endContent={<Icon icon="lucide:chevron-down" width={16} height={16} />}
               >
                 {opcionesOrden.find(o => o.key === filtros.ordenarPor)?.label || "Ordenar"}
               </Button>
@@ -407,7 +400,7 @@ export const CatalogPage: React.FC<{ categoriaInicial?: string | null }> = ({ ca
       ) : (
         <Card className="w-full p-12 text-center">
           <div className="flex flex-col items-center gap-4">
-            <Icon icon="lucide:search-x" size={48} className="text-default-400" />
+            <Icon icon="lucide:search-x" width={48} height={48} className="text-default-400" />
             <h3 className="text-xl font-semibold">No se encontraron productos</h3>
             <p className="text-default-500">
               Intenta ajustar tu búsqueda o los filtros seleccionados.
@@ -444,3 +437,5 @@ export const CatalogPage: React.FC<{ categoriaInicial?: string | null }> = ({ ca
     </div>
   );
 };
+
+export default CatalogPage;

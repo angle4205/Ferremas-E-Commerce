@@ -1,8 +1,7 @@
 import React from "react";
 import { Button, Avatar, Divider, Chip } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import { Error404 } from "./error-404";
-import { getCookie } from "../utils/cookies"; // Asegúrate de importar desde utils
+import { getCookie } from "../utils/cookies";
 
 type Direccion = {
   id: number;
@@ -29,7 +28,7 @@ type PerfilUsuario = {
 
 const ROLES_ADMIN = ["ADMINISTRADOR", "EMPLEADO", "BODEGUERO", "CONTADOR"];
 
-export const UserProfile: React.FC<{
+const ProfilePage: React.FC<{
   perfil?: PerfilUsuario;
   onGoDashboard?: () => void;
   onLogout?: () => void;
@@ -60,7 +59,7 @@ export const UserProfile: React.FC<{
       // Puedes mostrar un error si quieres
     } finally {
       setLoggingOut(false);
-      if (onLogout) onLogout(); // <-- Llama siempre aquí
+      if (onLogout) onLogout();
     }
   };
 
@@ -153,3 +152,5 @@ export const UserProfile: React.FC<{
     </section>
   );
 };
+
+export default ProfilePage;

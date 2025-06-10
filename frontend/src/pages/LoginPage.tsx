@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Input, Button, Card } from "@heroui/react";
 import { getCookie } from "../utils/cookies";
 
-export const LoginForm: React.FC<{
+const LoginPage: React.FC<{
   onLoginSuccess?: () => void;
   onShowRegister?: () => void;
 }> = ({ onLoginSuccess, onShowRegister }) => {
@@ -73,3 +73,5 @@ export const LoginForm: React.FC<{
     </div>
   );
 };
+
+export default LoginPage;

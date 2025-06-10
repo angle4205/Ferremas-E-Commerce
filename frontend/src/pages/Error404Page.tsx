@@ -2,7 +2,7 @@ import React from "react";
 import { Card, Button } from "@heroui/react";
 import { Icon } from "@iconify/react";
 
-export const Error404: React.FC<{ onGoHome?: () => void }> = ({ onGoHome }) => (
+const Error404Page: React.FC<{ onGoHome?: () => void }> = ({ onGoHome }) => (
   <div className="flex justify-center items-center min-h-[60vh]">
     <Card className="w-full max-w-md p-8 flex flex-col items-center shadow-lg">
       <Icon icon="lucide:alert-triangle" className="text-danger-500" width={48} height={48} />
@@ -21,4 +21,4 @@ export const Error404: React.FC<{ onGoHome?: () => void }> = ({ onGoHome }) => (
   </div>
 );
 
-export default Error404;
+export default Error404Page;
