@@ -10,13 +10,21 @@ export default {
   theme: {
     extend: {
       colors: {
+        primary: "#00A6CB",
+        "primary-dark": "#800080",
         background: {
-          DEFAULT: "#f8fafc",
           dark: "#0d1117",
         },
       },
     },
   },
   darkMode: "class",
-  plugins: [heroui()],
+  plugins: [
+    heroui({
+      themes: {
+        light: { colors: { primary: "#00A6CB" } },
+        dark: { colors: { primary: "#800080" } },
+      },
+    }),
+  ],
 };

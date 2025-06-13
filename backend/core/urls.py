@@ -42,6 +42,7 @@ from .views import (
     CartItemUpdateAPIView, 
     CartItemDeleteAPIView,
     CartItemCreateAPIView,
+    StripePaymentAPIView,
 )
 from django.conf import settings
 from django.conf.urls.static import static
@@ -72,6 +73,9 @@ urlpatterns = [
     path("api/cart/items/<int:item_id>/", CartItemUpdateAPIView.as_view(), name="cart-item-update"),
     path("api/cart/items/<int:item_id>/delete/", CartItemDeleteAPIView.as_view(), name="cart-item-delete"),
     path("api/cart/items/", CartItemCreateAPIView.as_view(), name="cart-item-create"),
+
+    # API Stripe
+    path('api/pago/stripe/', StripePaymentAPIView.as_view(), name='stripe-payment'),
 
     # API Empleados
     path('api/empleados/marcar_entrada/', MarcarEntradaAPIView.as_view(), name='empleado-marcar-entrada'),

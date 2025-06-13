@@ -24,7 +24,9 @@ import RegisterPage from "./pages/RegisterPage";
 import ProfilePage from "./pages/ProfilePage";
 import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
 import CartModal from "./components/CartModal";
+import PagoExitoPage from "./pages/PagoExitoPage";
 import { Icon } from "@iconify/react/dist/iconify.js";
+import { Routes, Route, useNavigate, Navigate, useLocation } from "react-router-dom";
 
 type PerfilUsuario = {
   id: number;
@@ -42,7 +44,6 @@ type PerfilUsuario = {
 };
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState("inicio");
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("theme");
@@ -71,7 +72,6 @@ export default function App() {
 
   const [perfil, setPerfil] = useState<PerfilUsuario | null>(null);
   const [perfilLoading, setPerfilLoading] = useState(true);
-  const [authPage, setAuthPage] = useState<null | "login" | "register" | "profile">(null);
 
   useEffect(() => {
     setPerfilLoading(true);
@@ -90,7 +90,6 @@ export default function App() {
       });
   }, []);
 
-  // Nueva función para actualizar el contador del carrito
   const fetchCartCount = () => {
     fetch("http://localhost:8000/api/cart/", { credentials: "include" })
       .then((res) => (res.ok ? res.json() : { items: [] }))
@@ -98,34 +97,13 @@ export default function App() {
       .catch(() => setCartItems(0));
   };
 
-  // Actualiza el contador al montar
   useEffect(() => {
     fetchCartCount();
   }, []);
 
-  const handleLoginSuccess = () => {
-    fetch("http://localhost:8000/api/usuario/perfil/", { credentials: "include" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => setPerfil(data))
-      .catch(() => setPerfil(null));
-    setAuthPage(null);
-  };
-
-  const handleRegisterSuccess = () => {
-    setAuthPage("login");
-  };
-
-  const [catalogoCategoria, setCatalogoCategoria] = useState<string | null>(null);
-
-  const navigateTo = (page: string, categoria?: string) => {
-    setAuthPage(null);
-    setCurrentPage(page);
-    if (page === "catalogo") {
-      setCatalogoCategoria(categoria ?? null);
-    }
-  };
-
-  const isDashboard = currentPage === "dashboard";
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith("/admin");
 
   // --- Búsqueda Navbar refactorizada ---
   const [searchTerm, setSearchTerm] = useState("");
@@ -155,7 +133,6 @@ export default function App() {
           if (p.marca) marcasSet.add(p.marca);
         });
 
-        // Marcas que matchean el término de búsqueda (case-insensitive), exactas primero
         const marcasFiltradas = Array.from(marcasSet)
           .filter((marca) => marca.toLowerCase().includes(searchTerm.trim().toLowerCase()))
           .sort((a, b) => {
@@ -165,13 +142,9 @@ export default function App() {
             return a.localeCompare(b);
           });
 
-        // Categorías que matchean el término de búsqueda
         const categoriasFiltradas = categorias.slice(0, 3);
-
-        // Productos que matchean el término de búsqueda
         const productosFiltrados = productos.slice(0, 5);
 
-        // Orden: marcas, categorías, productos
         const results: { type: "producto" | "marca" | "categoria"; label: string; id?: number; key?: string }[] = [];
 
         marcasFiltradas.slice(0, 3).forEach((marca) => {
@@ -194,212 +167,251 @@ export default function App() {
   const handleSearchSelect = (item: { type: string; label: string; id?: number }) => {
     setSearchTerm("");
     if (item.type === "producto") {
-      navigateTo("catalogo");
-      // TODO: Puedes guardar el id en un estado global o navegar a un detalle
+      navigate("/catalogo");
+      // Puedes guardar el id en un estado global o navegar a un detalle
     } else if (item.type === "categoria") {
-      navigateTo("catalogo", item.label.split("..")[0]);
+      navigate("/catalogo");
+      // Puedes filtrar por categoría si lo implementas
     }
-    // TODO: Si quieres filtrar por marca, puedes implementar lógica aquí
+    // Si quieres filtrar por marca, puedes implementar lógica aquí
   };
 
   return (
     <div className="min-h-screen bg-background dark:bg-background-dark">
-      {currentPage === "dashboard" ? (
-        !perfil ? (
-          <div className="flex justify-center items-center min-h-screen">
-            <Spinner size="lg" />
-          </div>
-        ) : (
-          <AdminDashboardPage
-            darkMode={darkMode}
-            setDarkMode={setDarkMode}
-            perfil={{
-              username: perfil.username,
-              email: perfil.email,
-              foto_url: perfil.foto_url ?? null,
-            }}
-            onProfile={() => {
-              setCurrentPage("inicio");
-              setAuthPage("profile");
-            }}
-            onLogout={() => {
-              setPerfil(null);
-              setCurrentPage("inicio");
-              setAuthPage("login");
-            }}
-            onHome={() => navigateTo("inicio")}
-          />
-        )
-      ) : (
-        <>
-          <Navbar maxWidth="xl" isBordered className="bg-background dark:bg-background-dark">
-            <NavbarBrand>
-              <Icon icon="lucide:hammer" className="text-primary text-2xl" />
-              <p className="font-bold text-inherit ml-2">FERREMAS+</p>
-            </NavbarBrand>
-            <NavbarContent className="hidden sm:flex gap-4" justify="center">
-              <NavbarItem isActive={currentPage === "inicio"}>
-                <Link
-                  color={currentPage === "inicio" ? "primary" : "foreground"}
-                  href="#"
-                  onClick={() => navigateTo("inicio")}
-                >
-                  Inicio
-                </Link>
-              </NavbarItem>
-              <NavbarItem isActive={currentPage === "catalogo"}>
-                <Link
-                  color={currentPage === "catalogo" ? "primary" : "foreground"}
-                  href="#"
-                  onClick={() => navigateTo("catalogo")}
-                >
-                  Catálogo
-                </Link>
-              </NavbarItem>
-            </NavbarContent>
-            <NavbarContent justify="end" className="gap-4">
-              <NavbarItem className="hidden sm:flex" style={{ minWidth: 0, flex: 1 }}>
-                <div className="w-full" style={{ minWidth: 240, maxWidth: 380 }}>
-                  <Autocomplete
-                    classNames={{
-                      base: "w-full",
-                      inputWrapper: "h-10 font-normal text-default-500 bg-default-100",
-                      input: "pl-9",
-                    }}
-                    placeholder="Buscar productos, marcas, categorías..."
-                    size="sm"
-                    startContent={<Icon icon="lucide:search" width={18} height={18} />}
-                    inputValue={searchTerm}
-                    onInputChange={setSearchTerm}
-                    isLoading={searchLoading}
-                    onSelectionChange={(key) => {
-                      const item = searchResults.find((i) => i.key === key);
-                      if (item) handleSearchSelect(item);
-                    }}
-                    aria-label="Buscar"
-                    items={searchResults}
-                    noResultsContent={<span className="p-4 text-default-400">Sin resultados</span>}
-                    loadingContent={<span className="p-4 text-default-400">Buscando...</span>}
-                  >
-                    {(item) => {
-                      // Separar nombre y contexto (.. en ...)
-                      const [nombre, contexto] = item.label.split("..");
-                      let icon = null;
-                      if (item.type === "producto") icon = <Icon icon="lucide:box" className="mr-2 text-primary" />;
-                      if (item.type === "marca") icon = <Icon icon="lucide:star" className="mr-2 text-yellow-500" />;
-                      if (item.type === "categoria") icon = <Icon icon="lucide:layers" className="mr-2 text-blue-500" />;
-                      return (
-                        <AutocompleteItem key={item.key} textValue={item.label}>
-                          <div className="flex items-center">
-                            {icon}
-                            <span className="font-medium">{nombre?.trim()}</span>
-                            {contexto && (
-                              <span className="ml-2 text-xs text-default-400">{contexto.trim()}</span>
-                            )}
-                          </div>
-                        </AutocompleteItem>
-                      );
-                    }}
-                  </Autocomplete>
-                </div>
-              </NavbarItem>
-              <NavbarItem>
-                <Switch
+      {/* Solo muestra el navbar público si NO estás en /admin */}
+      {!isAdminRoute && (
+        <Navbar maxWidth="xl" isBordered className="bg-background dark:bg-background-dark">
+          <NavbarBrand>
+            <Icon icon="lucide:hammer" className="text-primary dark:text-primary-dark text-2xl" />
+            <span
+              className="font-bold text-inherit ml-2 cursor-pointer"
+              onClick={() => navigate("/")}
+            >
+              FERREMAS+
+            </span>
+          </NavbarBrand>
+          <NavbarContent className="hidden sm:flex gap-4" justify="center">
+            <NavbarItem>
+              <button
+                onClick={() => navigate("/")}
+                className={`font-medium transition-colors ${
+                  window.location.pathname === "/"
+                    ? "text-primary dark:text-primary-dark"
+                    : "text-foreground hover:text-primary dark:hover:text-primary-dark"
+                }`}
+              >
+                Inicio
+              </button>
+            </NavbarItem>
+            <NavbarItem>
+              <button
+                onClick={() => navigate("/catalogo")}
+                className={`font-medium transition-colors ${
+                  window.location.pathname === "/catalogo"
+                    ? "text-primary dark:text-primary-dark"
+                    : "text-foreground hover:text-primary dark:hover:text-primary-dark"
+                }`}
+              >
+                Catálogo
+              </button>
+            </NavbarItem>
+          </NavbarContent>
+          <NavbarContent justify="end" className="gap-4">
+            <NavbarItem className="hidden sm:flex" style={{ minWidth: 0, flex: 1 }}>
+              <div className="w-full" style={{ minWidth: 240, maxWidth: 380 }}>
+                <Autocomplete
+                  classNames={{
+                    base: "w-full",
+                  }}
+                  placeholder="Buscar productos, marcas, categorías..."
                   size="sm"
-                  color="primary"
-                  isSelected={darkMode}
-                  onValueChange={setDarkMode}
-                  startContent={<Icon icon="lucide:sun" className="text-yellow-400" />}
-                  endContent={<Icon icon="lucide:moon" className="text-blue-500" />}
-                  aria-label="Cambiar modo oscuro"
-                />
-              </NavbarItem>
-              <NavbarItem>
+                  startContent={
+                    <Icon icon="lucide:search" width={18} height={18} className="text-primary dark:text-primary-dark" />
+                  }
+                  inputValue={searchTerm}
+                  onInputChange={setSearchTerm}
+                  isLoading={searchLoading}
+                  onSelectionChange={(key) => {
+                    const item = searchResults.find((i) => i.key === key);
+                    if (item) handleSearchSelect(item);
+                  }}
+                  aria-label="Buscar"
+                  items={searchResults}
+                >
+                  {(item) => {
+                    const [nombre, contexto] = item.label.split("..");
+                    let icon = null;
+                    if (item.type === "producto")
+                      icon = <Icon icon="lucide:box" className="mr-2 text-primary dark:text-primary-dark" />;
+                    if (item.type === "marca")
+                      icon = <Icon icon="lucide:star" className="mr-2 text-yellow-500" />;
+                    if (item.type === "categoria")
+                      icon = <Icon icon="lucide:layers" className="mr-2 text-blue-500" />;
+                    return (
+                      <AutocompleteItem key={item.key} textValue={item.label}>
+                        <div className="flex items-center">
+                          {icon}
+                          <span className="font-medium">{nombre?.trim()}</span>
+                          {contexto && (
+                            <span className="ml-2 text-xs text-default-400">{contexto.trim()}</span>
+                          )}
+                        </div>
+                      </AutocompleteItem>
+                    );
+                  }}
+                </Autocomplete>
+              </div>
+            </NavbarItem>
+            <NavbarItem>
+              <Switch
+                size="sm"
+                color="primary"
+                isSelected={darkMode}
+                onValueChange={setDarkMode}
+                startContent={<Icon icon="lucide:sun" className="text-yellow-400" />}
+                endContent={<Icon icon="lucide:moon" />}
+                aria-label="Cambiar modo oscuro"
+              />
+            </NavbarItem>
+            <NavbarItem>
+              <Button
+                isIconOnly
+                variant="light"
+                radius="full"
+                onClick={() => navigate(perfil ? "/profile" : "/login")}
+                className="hover:bg-primary/20 dark:hover:bg-primary-dark/20 transition-colors"
+              >
+                <Icon icon="lucide:user" className="text-default-500" width={20} height={20} />
+              </Button>
+            </NavbarItem>
+            <NavbarItem>
+              <Badge content={cartItems} color="primary">
                 <Button
                   isIconOnly
                   variant="light"
                   radius="full"
-                  onClick={() => {
-                    if (perfil) setAuthPage("profile");
-                    else setAuthPage("login");
-                  }}
+                  onClick={() => setIsCartModalOpen(true)}
+                  className="hover:bg-primary/20 dark:hover:bg-primary-dark/20 transition-colors"
                 >
-                  <Icon icon="lucide:user" className="text-default-500" width={20} height={20} />
+                  <Icon icon="lucide:shopping-cart" className="text-default-500" width={20} height={20} />
                 </Button>
-              </NavbarItem>
-              <NavbarItem>
-                <Badge content={cartItems} color="primary">
-                  <Button
-                    isIconOnly
-                    variant="light"
-                    radius="full"
-                    onClick={() => setIsCartModalOpen(true)}
-                  >
-                    <Icon icon="lucide:shopping-cart" className="text-default-500" width={20} height={20} />
-                  </Button>
-                </Badge>
-              </NavbarItem>
-            </NavbarContent>
-          </Navbar>
+              </Badge>
+            </NavbarItem>
+          </NavbarContent>
+        </Navbar>
+      )}
 
-          <main className="container mx-auto px-4 py-4">
-            {authPage === "login" ? (
+      <main
+        className={
+          isAdminRoute
+            ? "w-full min-h-[80vh] p-0"
+            : "container mx-auto px-4 py-4"
+        }
+      >
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <>
+                <HeroSection />
+                <FeaturedCategories navigateTo={() => navigate("/catalogo")} />
+                <PopularProducts navigateTo={() => navigate("/catalogo")} />
+                <PromoBanner />
+                <ServiceFeatures />
+              </>
+            }
+          />
+          <Route path="/catalogo" element={<CatalogPage />} />
+          <Route
+            path="/login"
+            element={
               <LoginPage
-                onLoginSuccess={handleLoginSuccess}
-                onShowRegister={() => setAuthPage("register")}
+                onLoginSuccess={() => {
+                  fetch("http://localhost:8000/api/usuario/perfil/", { credentials: "include" })
+                    .then((res) => (res.ok ? res.json() : null))
+                    .then((data) => setPerfil(data))
+                    .catch(() => setPerfil(null));
+                  navigate("/");
+                }}
+                onShowRegister={() => navigate("/register")}
               />
-            ) : authPage === "register" ? (
+            }
+          />
+          <Route
+            path="/register"
+            element={
               <RegisterPage
-                onRegisterSuccess={handleRegisterSuccess}
-                onShowLogin={() => setAuthPage("login")}
+                onRegisterSuccess={() => navigate("/login")}
+                onShowLogin={() => navigate("/login")}
               />
-              ) : authPage === "profile" ? (
+            }
+          />
+          <Route
+            path="/profile"
+            element={
               perfilLoading ? (
                 <div className="flex justify-center items-center min-h-[40vh]">
                   <Spinner size="lg" />
                 </div>
-              ) : (
+              ) : perfil ? (
                 <ProfilePage
-                  perfil={perfil ?? undefined}
-                  onGoDashboard={() => {
-                    setAuthPage(null);
-                    setCurrentPage("dashboard");
-                  }}
+                  perfil={perfil}
+                  onGoDashboard={() => navigate("/admin")}
                   onLogout={() => {
                     setPerfil(null);
-                    setCurrentPage("inicio");
-                    setAuthPage("login");
+                    navigate("/login");
                   }}
                 />
+              ) : (
+                <Navigate to="/login" />
               )
-            ) : currentPage === "inicio" ? (
-                <>
-                  <HeroSection onVerCatalogo={() => navigateTo("catalogo")}/>
-                  <FeaturedCategories navigateTo={navigateTo} />
-                  <PopularProducts navigateTo={navigateTo} />
-                  <PromoBanner />
-                  <ServiceFeatures />
-                </>
-            ) : currentPage === "catalogo" ? (
-                <CatalogPage categoriaInicial={catalogoCategoria} />
-            ) : null}
-          </main>
-          <Footer navigateTo={navigateTo} />
-
-          <CartModal
-            isOpen={isCartModalOpen}
-            onClose={() => {
-              setIsCartModalOpen(false);
-              fetchCartCount();
-            }}
-            onCheckout={() => {
-              setIsCartModalOpen(false);
-              fetchCartCount();
-              navigateTo("checkout");
-            }}
-            key={isCartModalOpen ? "open" : "closed"}
+            }
           />
-        </>
+          <Route
+            path="/admin"
+            element={
+              perfil && perfil.rol === "ADMINISTRADOR" ? (
+                <AdminDashboardPage
+                  darkMode={darkMode}
+                  setDarkMode={setDarkMode}
+                  perfil={{
+                    username: perfil.username,
+                    email: perfil.email,
+                    foto_url: perfil.foto_url ?? null,
+                  }}
+                  onProfile={() => navigate("/profile")}
+                  onLogout={() => {
+                    setPerfil(null);
+                    navigate("/login");
+                  }}
+                  onHome={() => navigate("/")}
+                />
+              ) : (
+                <Navigate to="/" />
+              )
+            }
+          />
+          <Route path="/pago/exito" element={<PagoExitoPage />} />
+        </Routes>
+      </main>
+
+      {/* Solo muestra el footer si NO estás en /admin */}
+      {!isAdminRoute && <Footer navigateTo={(page) => navigate(page)} />}
+
+      {/* Solo muestra el CartModal si NO estás en /admin */}
+      {!isAdminRoute && (
+        <CartModal
+          isOpen={isCartModalOpen}
+          onClose={() => {
+            setIsCartModalOpen(false);
+            fetchCartCount();
+          }}
+          onCheckout={() => {
+            setIsCartModalOpen(false);
+            fetchCartCount();
+          }}
+          key={isCartModalOpen ? "open" : "closed"}
+        />
       )}
     </div>
   );

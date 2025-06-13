@@ -2,6 +2,16 @@ import React, { useEffect, useState, Fragment } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import { Icon } from "@iconify/react";
 import { getCookie } from "../utils/cookies";
+import { loadStripe } from "@stripe/stripe-js";
+
+declare global {
+  interface ImportMeta {
+    env: {
+      VITE_STRIPE_PUBLIC_KEY?: string;
+      [key: string]: any;
+    };
+  }
+}
 
 interface CartItem {
   id: number;
@@ -21,9 +31,11 @@ interface CartModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCheckout: () => void;
+  onPaymentSuccess?: () => void; // <-- Añade esta prop para abrir ConfirmacionModal
 }
 
 const API_BASE_URL = "http://localhost:8000/api";
+const STRIPE_PUBLIC_KEY = import.meta.env.VITE_STRIPE_PUBLIC_KEY || "pk_test_xxx"; // Usa tu clave pública
 
 const formatoCLP = (valor: number) =>
   valor.toLocaleString("es-CL", {
@@ -55,7 +67,7 @@ async function updateCartItem(itemId: number, cantidad: number): Promise<CartIte
 
 async function removeCartItem(itemId: number): Promise<void> {
   const csrftoken = getCookie("csrftoken");
-  const response = await fetch(`${API_BASE_URL}/cart/items/${itemId}/delete/`, { // <-- aquí el /delete/
+  const response = await fetch(`${API_BASE_URL}/cart/items/${itemId}/delete/`, {
     method: "DELETE",
     headers: { "X-CSRFToken": csrftoken || "" },
     credentials: "include",
@@ -63,12 +75,17 @@ async function removeCartItem(itemId: number): Promise<void> {
   if (!response.ok) throw new Error("Error al eliminar el producto");
 }
 
-const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose, onCheckout }) => {
+const CartModal: React.FC<CartModalProps> = ({
+  isOpen,
+  onClose,
+  onCheckout,
+  onPaymentSuccess,
+}) => {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [total, setTotal] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Estado local para los inputs de cantidad
+  const [paying, setPaying] = useState(false); // Estado para animación de pago
   const [inputValues, setInputValues] = useState<Record<number, string>>({});
 
   useEffect(() => {
@@ -83,7 +100,6 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose, onCheckout }) =>
       const { items, total } = await getCart();
       setCartItems(items);
       setTotal(total);
-      // Sincroniza los valores de los inputs con el carrito
       const values: Record<number, string> = {};
       items.forEach((item) => {
         values[item.id] = item.cantidad.toString();
@@ -96,19 +112,16 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose, onCheckout }) =>
     }
   };
 
-  // Maneja el cambio en el input (permite vacío)
   const handleInputChange = (itemId: number, value: string) => {
     if (/^\d*$/.test(value)) {
       setInputValues((prev) => ({ ...prev, [itemId]: value }));
     }
   };
 
-  // Cuando el input pierde foco o se presiona Enter, actualiza el backend si es válido
   const handleInputBlur = async (itemId: number) => {
     const value = inputValues[itemId];
     const cantidad = parseInt(value, 10);
     if (!value || isNaN(cantidad) || cantidad < 1) {
-      // Si está vacío o inválido, restaura el valor original
       const original = cartItems.find((i) => i.id === itemId)?.cantidad ?? 1;
       setInputValues((prev) => ({ ...prev, [itemId]: original.toString() }));
       return;
@@ -133,6 +146,47 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose, onCheckout }) =>
       fetchCart();
     } catch {
       setError("Error al eliminar el producto.");
+    }
+  };
+
+  // --- Stripe Checkout ---
+  const handleStripeCheckout = async () => {
+    setPaying(true);
+    setError(null);
+    try {
+      const csrftoken = getCookie("csrftoken");
+      const response = await fetch(`${API_BASE_URL}/pago/stripe/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": csrftoken || "",
+        },
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        setError(data.error || "Error al iniciar el pago.");
+        setPaying(false);
+        return;
+      }
+      const data = await response.json();
+      const stripe = await loadStripe(STRIPE_PUBLIC_KEY);
+      if (!stripe) {
+        setError("No se pudo cargar Stripe.");
+        setPaying(false);
+        return;
+      }
+      // Redirige al portal de pago de Stripe
+      const { sessionId } = data;
+      const { error: stripeError } = await stripe.redirectToCheckout({ sessionId });
+      if (stripeError) {
+        setError(stripeError.message || "Error al redirigir a Stripe.");
+        setPaying(false);
+      }
+      // El usuario será redirigido, así que no necesitas cerrar el modal aquí.
+    } catch (e) {
+      setError("Error al conectar con Stripe.");
+      setPaying(false);
     }
   };
 
@@ -256,15 +310,27 @@ const CartModal: React.FC<CartModalProps> = ({ isOpen, onClose, onCheckout }) =>
                     type="button"
                     className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-100"
                     onClick={onClose}
+                    disabled={paying}
                   >
                     Seguir comprando
                   </button>
                   <button
                     type="button"
-                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 dark:bg-blue-700 dark:hover:bg-blue-600"
-                    onClick={onCheckout}
+                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 dark:bg-blue-700 dark:hover:bg-blue-600 flex items-center justify-center"
+                    onClick={handleStripeCheckout}
+                    disabled={paying || cartItems.length === 0}
                   >
-                    Ir a pagar
+                    {paying ? (
+                      <>
+                        <svg className="animate-spin h-5 w-5 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                        </svg>
+                        Procesando...
+                      </>
+                    ) : (
+                      "Ir a pagar"
+                    )}
                   </button>
                 </div>
               </Dialog.Panel>

@@ -5,6 +5,9 @@ __pycache__/
 *.pyo
 *.pyd
 
+# Variables de entorno (Stripe keys, etc.)
+.env
+
 # Django staticfiles (solo si usas collectstatic para prod, no para tu build de front)
 backend/core/static/*
 

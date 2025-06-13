@@ -13,6 +13,9 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import mimetypes
 from pathlib import Path
 import os
+import dotenv
+
+dotenv.load_dotenv()
 
 mimetypes.init() 
 mimetypes.add_type("application/javascript", ".js", True)
@@ -152,3 +155,10 @@ CSRF_TRUSTED_ORIGINS = [
 # Session settings
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 7 
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+
+# Stripe keys
+STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "sk_test_xxx")
+STRIPE_PUBLIC_KEY = os.environ.get("STRIPE_PUBLIC_KEY", "pk_test_xxx")
+
+# Frontend URL (para CORS)
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")

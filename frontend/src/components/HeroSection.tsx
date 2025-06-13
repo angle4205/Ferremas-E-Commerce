@@ -47,7 +47,7 @@ const HeroCarousel: React.FC = () => {
 };
 
 const HeroSection: React.FC<HeroSectionProps> = ({ onVerCatalogo }) => (
-  <Card className="bg-primary-500 text-white border-none overflow-hidden mb-12">
+  <Card className="bg-primary dark:bg-primary-dark text-white border-none overflow-hidden mb-12 transition-colors duration-300">
     <div className="max-w-4xl mx-auto px-4 sm:px-8 py-8 flex flex-col items-start gap-4">
       <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 text-left w-full">
         Todo para tu proyecto, en un solo lugar

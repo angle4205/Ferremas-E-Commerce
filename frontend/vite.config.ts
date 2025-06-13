@@ -4,7 +4,7 @@ import vitePluginInjectDataLocator from "./plugins/vite-plugin-inject-data-locat
 import { resolve } from "path";
 
 export default defineConfig({
-  base: "/static/landing/",
+  base: "",
   plugins: [react(), vitePluginInjectDataLocator()],
   server: {
     allowedHosts: true,

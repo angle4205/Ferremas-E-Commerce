@@ -8,15 +8,6 @@ from rest_framework import status, permissions
 from rest_framework.generics import get_object_or_404
 from rest_framework.pagination import PageNumberPagination
 from .models import Producto, UserProfile, Pedido, ItemPedido, Categoria, Cliente, TurnoEmpleado
-from .serializers import (
-    ProductoSerializer,
-    ProductoEnItemPedidoSerializer,
-    ItemPedidoSerializer,
-    PedidoSimpleSerializer,
-    PedidoDetailSerializer,
-    UserProfileSerializer,
-    ItemCarritoSerializer,
-)
 from django.utils import timezone
 from django.db import models
 from django.contrib.auth import authenticate, login, logout
@@ -26,6 +17,17 @@ from django.utils.decorators import method_decorator
 from django.http import JsonResponse
 from django.db.models import Sum, Count
 from .models import Cart, ItemCarrito
+import stripe
+from .serializers import (
+    ProductoSerializer,
+    ProductoEnItemPedidoSerializer,
+    ItemPedidoSerializer,
+    PedidoSimpleSerializer,
+    PedidoDetailSerializer,
+    UserProfileSerializer,
+    ItemCarritoSerializer,
+)
+
 
 # --- Vistas de navegación ---
 
@@ -678,3 +680,58 @@ class CSRFTokenView(APIView):
     def get(self, request):
         # El decorador ya se encarga de setear la cookie
         return JsonResponse({"success": True, "mensaje": "CSRF cookie set"})
+
+class StripePaymentAPIView(APIView):
+    """
+    Inicia el pago con Stripe Checkout Session para el carrito activo del usuario autenticado.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+
+        # Obtén el carrito activo del usuario
+        try:
+            cart = Cart.objects.get(user=request.user, estado="ACTIVO")
+        except Cart.DoesNotExist:
+            return Response({"error": "No hay carrito activo."}, status=400)
+
+        cart.calcular_totales()
+        total_stripe = cart.total_para_stripe()
+        if total_stripe < 50:
+            return Response({"error": "El monto mínimo para pagar es $50 CLP."}, status=400)
+
+        # Construye los items para Stripe Checkout
+        line_items = []
+        for item in cart.items.all():
+            line_items.append({
+                "price_data": {
+                    "currency": "clp",
+                    "product_data": {
+                        "name": item.producto.nombre,
+                    },
+                    "unit_amount": int(item.precio_unitario),  # en CLP
+                },
+                "quantity": item.cantidad,
+            })
+
+        # URL de éxito y cancelación (ajusta según tu frontend)
+        success_url = settings.FRONTEND_URL + "/pago/exito"
+        cancel_url = settings.FRONTEND_URL + "/carrito"
+
+        try:
+            session = stripe.checkout.Session.create(
+                payment_method_types=["card"],
+                line_items=line_items,
+                mode="payment",
+                success_url=success_url + "?session_id={CHECKOUT_SESSION_ID}",
+                cancel_url=cancel_url,
+                metadata={"user_id": request.user.id, "cart_id": cart.id},
+                customer_email=request.user.email,
+            )
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+
+        # Aquí puedes crear el Pedido y Pago como antes si lo necesitas
+
+        return Response({"sessionId": session.id})
