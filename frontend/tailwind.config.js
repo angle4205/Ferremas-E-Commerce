@@ -10,8 +10,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: "#00A6CB",
-        "primary-dark": "#800080",
+        primary: "#0047AB",
         background: {
           dark: "#0d1117",
         },
@@ -23,7 +22,7 @@ export default {
     heroui({
       themes: {
         light: { colors: { primary: "#00A6CB" } },
-        dark: { colors: { primary: "#800080" } },
+        dark: { colors: { primary: "#00A6CB" } }, // mismo color para ambos
       },
     }),
   ],
