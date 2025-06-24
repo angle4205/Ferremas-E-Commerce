@@ -83,6 +83,20 @@ class IsAdminEmpleado(permissions.BasePermission):
             and getattr(request.user.profile.rol, "nombre", None) == "ADMINISTRADOR"
         )
 
+class IsAdminOrEmpleadoEspecial(permissions.BasePermission):
+    """
+    Permite acceso a admin y a empleados con subrol CONTADOR o BODEGUERO.
+    """
+    def has_permission(self, request, view):
+        user = request.user
+        profile = getattr(user, "profile", None)
+        if user.is_superuser or user.is_staff:
+            return True
+        if profile and getattr(profile.rol, "nombre", None) == "EMPLEADO":
+            # Permite acceso a ciertos subroles
+            return profile.tipo_empleado in ["CONTADOR", "BODEGUERO"]
+        return False
+
 # --- Helpers privados y mixins ---
 
 def _respuesta_ok(data=None, mensaje="", status_code=status.HTTP_200_OK):
@@ -321,6 +335,7 @@ class PerfilUsuarioAPIView(APIView):
             "username": user.username,
             "email": user.email,
             "rol": getattr(profile.rol, "nombre", None) if profile else None,
+            "tipo_empleado": getattr(profile, "tipo_empleado", None) if profile else None,  # <--- AGREGA ESTA LÍNEA
             "is_staff": user.is_staff,
             "is_superuser": user.is_superuser,
             "cliente": {
@@ -561,7 +576,7 @@ class AdminOverviewAPIView(APIView):
     """
     Devuelve el resumen general para el dashboard de administrador.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminOrEmpleadoEspecial]
 
     def get(self, request):
         # Ingresos totales (solo pedidos entregados)
@@ -619,7 +634,7 @@ class AdminOverviewAPIView(APIView):
 # --- Órdenes para dashboard admin: listar, asignar, modificar ---
 
 class AdminOrderListAPIView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsAdminEmpleado]
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrEmpleadoEspecial]
 
     def get(self, request):
         pedidos = Pedido.objects.select_related("cliente", "bodeguero_asignado").order_by("-fecha_creacion")
@@ -646,7 +661,7 @@ class AdminOrderAssignAPIView(APIView):
         return Response({"success": False, "mensaje": "No hay bodegueros disponibles."}, status=400)
 
 class AdminOrderUpdateAPIView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsAdminEmpleado]
+    permission_classes = [IsAuthenticated, IsAdminOrEmpleadoEspecial]
 
     def patch(self, request, pedido_id):
         pedido = get_object_or_404(Pedido, id=pedido_id)
@@ -660,7 +675,7 @@ class AdminOrderUpdateAPIView(APIView):
 # --- Reportes financieros para admin ---
 
 class AdminFinancialReportAPIView(APIView):
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAuthenticated, IsAdminOrEmpleadoEspecial]
 
     def get(self, request, *args, **kwargs):
         print("GET recibido", request.GET)

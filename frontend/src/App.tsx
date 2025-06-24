@@ -41,6 +41,7 @@ type PerfilUsuario = {
     fecha_registro: string;
   } | null;
   direcciones: any[];
+  tipo_empleado?: string | null; // <-- Asegúrate de incluir esto
 };
 
 export default function App() {
@@ -174,6 +175,20 @@ export default function App() {
       // Puedes filtrar por categoría si lo implementas
     }
     // Si quieres filtrar por marca, puedes implementar lógica aquí
+  };
+
+  // Permite acceso a admin y empleados (cualquier subrol)
+  const puedeAccederAdmin = (perfil: PerfilUsuario | null) => {
+    if (!perfil) return false;
+    if (perfil.rol === "ADMINISTRADOR") return true;
+    if (perfil.rol === "EMPLEADO") return true;
+    return false;
+  };
+
+  // Obtiene subrol si es empleado
+  const getSubrol = (perfil: PerfilUsuario | null) => {
+    if (!perfil || perfil.rol !== "EMPLEADO") return null;
+    return perfil.tipo_empleado || null;
   };
 
   return (
@@ -370,14 +385,20 @@ export default function App() {
           <Route
             path="/admin"
             element={
-              perfil && perfil.rol === "ADMINISTRADOR" ? (
+              perfilLoading ? (
+                <div className="flex justify-center items-center min-h-[40vh]">
+                  <Spinner size="lg" />
+                </div>
+              ) : puedeAccederAdmin(perfil) ? (
                 <AdminDashboardPage
                   darkMode={darkMode}
                   setDarkMode={setDarkMode}
                   perfil={{
-                    username: perfil.username,
-                    email: perfil.email,
-                    foto_url: perfil.foto_url ?? null,
+                    username: perfil!.username,
+                    email: perfil!.email,
+                    foto_url: perfil!.foto_url ?? null,
+                    rol: perfil!.rol,
+                    subrol: getSubrol(perfil),
                   }}
                   onProfile={() => navigate("/profile")}
                   onLogout={() => {

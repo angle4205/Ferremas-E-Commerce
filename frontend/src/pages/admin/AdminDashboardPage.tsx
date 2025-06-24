@@ -12,11 +12,16 @@ import SalesChart from "../../components/admin/SalesChart";
 import RecentOrders from "../../components/admin/RecentOrders";
 import InventoryStatus from "../../components/admin/InventoryStatus";
 import { Spinner } from "@heroui/react";
+import { Icon } from "@iconify/react";
+import Error404Page from "../Error404Page";
 
 type PerfilUsuario = {
   username: string;
   email: string;
   foto_url?: string | null;
+  rol?: string | null;
+  subrol?: string | null;
+  tipo_empleado?: string | null;
 };
 
 interface AdminDashboardPageProps {
@@ -28,6 +33,19 @@ interface AdminDashboardPageProps {
   onHome: () => void;
 }
 
+const getSubrol = (perfil: PerfilUsuario | null) => {
+  if (!perfil) return "";
+  return (perfil.tipo_empleado || perfil.subrol || "").toUpperCase().trim();
+};
+
+const getInitialPage = (rol: string, subrol: string) => {
+  if (rol === "ADMINISTRADOR") return "dashboard";
+  if (rol === "EMPLEADO" && subrol === "CONTADOR") return "dashboard";
+  if (rol === "EMPLEADO" && subrol === "BODEGUERO") return "turno";
+  if (rol === "EMPLEADO") return "turno";
+  return "turno";
+};
+
 const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
   darkMode,
   setDarkMode,
@@ -36,8 +54,14 @@ const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
   onLogout,
   onHome,
 }) => {
+  const rol = (perfil?.rol || "").toUpperCase().trim();
+  const subrol = getSubrol(perfil);
+
+  // Inicializa currentPage según el rol/subrol
+  const [currentPage, setCurrentPage] = React.useState(() =>
+    getInitialPage(rol, subrol)
+  );
   const [collapsed, setCollapsed] = React.useState(false);
-  const [currentPage, setCurrentPage] = React.useState("dashboard");
 
   const renderContent = () => {
     switch (currentPage) {
@@ -72,15 +96,23 @@ const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
         return <ShiftsPage />;
       case "audit":
         return <AuditPage />;
+      // Pestañas sin lógica implementada:
+      case "turno":
+      case "ordenes-bodeguero":
+        return <Error404Page onGoHome={onHome} />;
       default:
-        return <DashboardOverview />;
+        return <Error404Page onGoHome={onHome} />;
     }
   };
 
   return (
     <div className={`flex flex-col h-screen w-full ${darkMode ? "dark" : ""}`}>
       <div className="flex flex-1 bg-background dark:bg-background-dark overflow-hidden">
-        <Sidebar onNavigate={setCurrentPage} rol="" />
+        <Sidebar
+          onNavigate={setCurrentPage}
+          rol={rol}
+          subrol={getSubrol(perfil)}
+        />
         <div className="flex-1 flex flex-col overflow-hidden">
           <DashboardHeader
             collapsed={collapsed}
