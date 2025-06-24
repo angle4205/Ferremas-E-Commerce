@@ -332,7 +332,7 @@ class Producto(models.Model):
     imagenes_secundarias = models.ManyToManyField(
         ImagenProducto, blank=True, related_name="productos", verbose_name=_("Imágenes secundarias")
     )
-    fecha_creacion = models.DateTimeField(auto_now_add=True, verbose_name=_("Fecha de creación"))
+    fecha_creacion = models.DateTimeField(default=timezone.now, verbose_name=_("Fecha de creación"))
     fecha_actualizacion = models.DateTimeField(auto_now=True, verbose_name=_("Fecha de actualización"))
 
     class Meta:
@@ -543,7 +543,7 @@ class Pedido(models.Model):
     ]
     cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name="pedidos", verbose_name=_("Cliente"))
     carrito = models.OneToOneField(Cart, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Carrito"))
-    fecha_creacion = models.DateTimeField(auto_now_add=True, verbose_name=_("Fecha de creación"))
+    fecha_creacion = models.DateTimeField(default=timezone.now, verbose_name=_("Fecha de creación"))
     fecha_actualizacion = models.DateTimeField(auto_now=True, verbose_name=_("Fecha de actualización"))
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default="SOLICITADO", verbose_name=_("Estado"))
     productos = models.ManyToManyField(Producto, through="ItemPedido", verbose_name=_("Productos"))

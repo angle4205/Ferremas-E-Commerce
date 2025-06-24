@@ -1,5 +1,10 @@
-import React from "react";
+import React, { useState } from "react";
 import Sidebar from "../../components/admin/Sidebar";
+import EmployeesPage from "../../components/admin/EmployeesPage";
+import ReportsPage from "../../components/admin/ReportsPage";
+import DiscountsPage from "../../components/admin/DiscountsPage";
+import ShiftsPage from "../../components/admin/ShiftsPage";
+import AuditPage from "../../components/admin/AuditPage";
 import DashboardHeader from "../../components/admin/DashboardHeader";
 import DashboardOverview from "../../components/admin/DashboardOverview";
 import OrdersTable from "../../components/admin/OrdersTable";
@@ -57,6 +62,16 @@ const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
         );
       case "orders":
         return <OrdersTable />;
+      case "employees":
+        return <EmployeesPage />;
+      case "reports":
+        return <ReportsPage />;
+      case "discounts":
+        return <DiscountsPage />;
+      case "shifts":
+        return <ShiftsPage />;
+      case "audit":
+        return <AuditPage />;
       default:
         return <DashboardOverview />;
     }

@@ -47,6 +47,7 @@ from .views import (
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
+from django.http import JsonResponse
 
 urlpatterns = [
     # Admin y Landing
@@ -95,6 +96,7 @@ urlpatterns = [
     path('api/admin/orders/<int:pedido_id>/assign/', AdminOrderAssignAPIView.as_view(), name='admin-order-assign'),
     path('api/admin/orders/<int:pedido_id>/', AdminOrderUpdateAPIView.as_view(), name='admin-order-update'),
     path('api/admin/reportes/financieros/', AdminFinancialReportAPIView.as_view(), name='admin-financial-report'),
+    path('api/admin/reportes/financieros_xlsx/', AdminFinancialReportAPIView.as_view(), name='admin-financial-report-xlsx'),
     path('api/admin/overview/', AdminOverviewAPIView.as_view(), name='admin-overview'),
     path('api/admin/empleados/', AdminEmpleadosListAPIView.as_view(), name='admin-empleados-list'),
     path('api/admin/empleados/<int:empleado_id>/', AdminEmpleadoDetailAPIView.as_view(), name='admin-empleado-detalle'),

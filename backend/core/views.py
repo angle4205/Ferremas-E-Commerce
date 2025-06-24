@@ -11,13 +11,15 @@ from .models import Producto, UserProfile, Pedido, ItemPedido, Categoria, Client
 from django.utils import timezone
 from django.db import models
 from django.contrib.auth import authenticate, login, logout
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.utils.decorators import method_decorator
 from django.http import JsonResponse
 from django.db.models import Sum, Count
 from .models import Cart, ItemCarrito
 import stripe
+import openpyxl
+from django.http import HttpResponse
 from .serializers import (
     ProductoSerializer,
     ProductoEnItemPedidoSerializer,
@@ -658,17 +660,79 @@ class AdminOrderUpdateAPIView(APIView):
 # --- Reportes financieros para admin ---
 
 class AdminFinancialReportAPIView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsAdminEmpleado]
+    permission_classes = [IsAdminUser]
 
-    def get(self, request):
-        total_ventas = Pedido.objects.filter(estado="ENTREGADO").aggregate(total=Sum("total"))["total"] or 0
-        pedidos_entregados = Pedido.objects.filter(estado="ENTREGADO").count()
-        pedidos_cancelados = Pedido.objects.filter(estado="CANCELADO").count()
-        return Response({
-            "total_ventas": total_ventas,
-            "pedidos_entregados": pedidos_entregados,
-            "pedidos_cancelados": pedidos_cancelados,
-        })
+    def get(self, request, *args, **kwargs):
+        print("GET recibido", request.GET)
+        if request.GET.get("export") == "xlsx":
+            print("Generando Excel detallado...")
+            wb = openpyxl.Workbook()
+            ws_resumen = wb.active
+            ws_resumen.title = "Resumen Diario"
+
+            # Hoja 1: Resumen diario (sin promedio)
+            ws_resumen.append([
+                "Fecha", "Órdenes Totales", "Entregadas", "Canceladas", "En preparación", "Ingresos (CLP)"
+            ])
+            hoy = timezone.now().date()
+            dias = 7
+            for i in range(dias):
+                fecha = hoy - timezone.timedelta(days=i)
+                pedidos = Pedido.objects.filter(fecha_creacion__date=fecha)
+                entregadas = pedidos.filter(estado="ENTREGADO")
+                total_entregadas = entregadas.count()
+                ingresos_entregadas = entregadas.aggregate(total=Sum("total"))["total"] or 0
+
+                ws_resumen.append([
+                    fecha.strftime("%Y-%m-%d"),
+                    pedidos.count(),
+                    total_entregadas,
+                    pedidos.filter(estado="CANCELADO").count(),
+                    pedidos.filter(estado="PREPARACION").count(),
+                    int(ingresos_entregadas),
+                ])
+
+            # Hoja 2: Detalle de órdenes
+            ws_detalle = wb.create_sheet(title="Órdenes Detalle")
+            ws_detalle.append([
+                "ID", "Cliente", "Fecha", "Estado", "Total (CLP)"
+            ])
+            pedidos = Pedido.objects.filter(
+                fecha_creacion__date__gte=hoy - timezone.timedelta(days=dias-1)
+            ).select_related("cliente")
+            for pedido in pedidos:
+                ws_detalle.append([
+                    pedido.id,
+                    getattr(pedido.cliente, "user", None).username if getattr(pedido.cliente, "user", None) else "",
+                    pedido.fecha_creacion.strftime("%Y-%m-%d %H:%M"),
+                    pedido.estado,
+                    int(pedido.total)
+                ])
+
+            response = HttpResponse(
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+            response["Content-Disposition"] = 'attachment; filename="reporte_financiero_detallado.xlsx"'
+            wb.save(response)
+            return response
+
+        # Respuesta JSON para la tabla (igual que antes)
+        hoy = timezone.now().date()
+        dias = 7
+        data = []
+        for i in range(dias):
+            fecha = hoy - timezone.timedelta(days=i)
+            pedidos = Pedido.objects.filter(fecha_creacion__date=fecha)
+            total_ordenes = pedidos.count()
+            total_ingresos = pedidos.exclude(estado="CANCELADO").aggregate(total=Sum("total"))["total"] or 0
+            total_canceladas = pedidos.filter(estado="CANCELADO").count()
+            data.append({
+                "fecha": fecha.strftime("%Y-%m-%d"),
+                "total_ordenes": total_ordenes,
+                "total_ingresos": int(total_ingresos),
+                "total_canceladas": total_canceladas,
+            })
+        return Response(data)
 
 @method_decorator(ensure_csrf_cookie, name="dispatch")
 class CSRFTokenView(APIView):

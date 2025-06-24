@@ -97,7 +97,7 @@ def run():
 
     # --- Productos ---
     productos = []
-    for i in range(20):
+    for i in range(30):
         categoria = random.choice(categorias)
         marca = random.choice(marcas)
         producto = Producto.objects.create(
@@ -136,7 +136,7 @@ def run():
 
     # --- Clientes ---
     clientes = []
-    for i in range(10):
+    for i in range(15):
         username = f"cliente{i+1}"
         email = f"cliente{i+1}@demo.cl"
         user = get_or_create_user(username, email, "cliente123")
@@ -156,20 +156,42 @@ def run():
     ]
     metodos = ["RETIRO_TIENDA", "DESPACHO_DOMICILIO"]
 
-    # Fecha de hoy fija y aware
-    hoy = timezone.make_aware(datetime(2025, 6, 8, 12, 0, 0))
+    hoy = timezone.now().date()
     hace_60_dias = hoy - timedelta(days=60)
 
-    # Genera 40 fechas aleatorias únicas previas a hoy
-    fechas_aleatorias = sorted(
-        [random_past_datetime(hace_60_dias, hoy - timedelta(days=1)) for _ in range(40)]
-    )
+    # Genera fechas distribuidas: al menos 2 pedidos por día en los últimos 21 días
+    fechas_pedidos = []
+    for dias_atras in range(21):
+        fecha = hoy - timedelta(days=dias_atras)
+        for _ in range(random.randint(2, 4)):
+            fechas_pedidos.append(
+                timezone.make_aware(datetime.combine(fecha, datetime.min.time()) + timedelta(hours=random.randint(8, 20)))
+            )
+    # Agrega fechas más antiguas para variedad
+    for _ in range(30):
+        fechas_pedidos.append(random_past_datetime(
+            timezone.make_aware(datetime.combine(hace_60_dias, datetime.min.time())),
+            timezone.make_aware(datetime.combine(hoy - timedelta(days=22), datetime.min.time()))
+        ))
 
-    for i in range(40):
+    random.shuffle(fechas_pedidos)
+
+    for i, fecha_creacion in enumerate(fechas_pedidos):
         cliente = random.choice(clientes)
-        estado = random.choice(estados)
+        # Distribuye estados para asegurar variedad
+        if i % 10 == 0:
+            estado = "CANCELADO"
+        elif i % 7 == 0:
+            estado = "ENTREGADO"
+        elif i % 5 == 0:
+            estado = "ENVIADO"
+        elif i % 3 == 0:
+            estado = "PREPARACION"
+        elif i % 2 == 0:
+            estado = "LISTO_RETIRO"
+        else:
+            estado = "SOLICITADO"
         metodo = random.choice(metodos)
-        fecha_creacion = fechas_aleatorias[i]
         pedido = Pedido.objects.create(
             cliente=cliente,
             estado=estado,
@@ -179,7 +201,7 @@ def run():
         )
         # Agregar items
         total = 0
-        for _ in range(random.randint(1, 5)):
+        for _ in range(random.randint(1, 6)):
             producto = random.choice(productos)
             cantidad = random.randint(1, 5)
             item = ItemPedido.objects.create(
@@ -200,7 +222,7 @@ def run():
                 pedido.bodeguero_asignado = bodeguero.user
                 pedido.save()
         # Crear pago si corresponde
-        if pedido.estado in ["ENTREGADO", "ENVIADO", "PREPARACION"]:
+        if pedido.estado in ["ENTREGADO", "ENVIADO", "PREPARACION", "LISTO_RETIRO"]:
             Pago.objects.create(
                 pedido=pedido,
                 stripe_id=f"stripe_{pedido.id}",
@@ -209,7 +231,7 @@ def run():
                 monto=pedido.total,
             )
 
-    print("¡Datos de prueba generados exitosamente!")
+    print("¡Datos de prueba variados generados exitosamente!")
 
 if __name__ == "__main__":
     run()
