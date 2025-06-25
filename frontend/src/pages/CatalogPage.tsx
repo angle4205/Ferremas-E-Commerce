@@ -1,4 +1,5 @@
 import React from "react";
+import { useNavigate } from "react-router-dom"; // <-- Agrega este import
 import { getCookie } from "../utils/cookies";
 import {
   Card,
@@ -26,6 +27,8 @@ interface Producto {
   categoria: string;
   disponible: boolean;
   rating?: number;
+  descuento?: number; // Añade descuento opcional
+  precio_con_descuento?: number; // Añade precio con descuento opcional
 }
 
 interface EstadoFiltros {
@@ -64,6 +67,8 @@ const agregarAlCarrito = async (productoId: number) => {
 };
 
 const TarjetaProducto: React.FC<{ producto: Producto }> = ({ producto }) => {
+  const navigate = useNavigate();
+
   let imagenUrl: string | null = null;
   if (producto.imagen_principal && typeof producto.imagen_principal === "string" && producto.imagen_principal.trim() !== "") {
     imagenUrl = producto.imagen_principal.startsWith("http")
@@ -71,26 +76,17 @@ const TarjetaProducto: React.FC<{ producto: Producto }> = ({ producto }) => {
       : `http://localhost:8000${producto.imagen_principal}`;
   }
 
-  // Renderiza estrellas según el rating (de 0 a 5)
-  const renderStars = (rating: number = 0) => {
-    const stars = [];
-    for (let i = 1; i <= 5; i++) {
-      stars.push(
-        <Icon
-          key={i}
-          icon={i <= Math.round(rating) ? "lucide:star" : "lucide:star-off"}
-          className={`text-yellow-400 ${i <= Math.round(rating) ? "" : "opacity-40"}`}
-          width={18}
-          height={18}
-        />
-      );
-    }
-    return <div className="flex items-center gap-0.5">{stars}</div>;
+  const tieneDescuento = producto.descuento && producto.descuento > 0 && producto.precio_con_descuento;
+
+  // Handler para navegar al detalle
+  const handleNavigate = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    navigate(`/producto/${producto.id}`);
   };
 
   return (
-    <Card className="w-full" isPressable disableRipple>
-      <CardBody className="p-0 overflow-hidden">
+    <Card className="w-full cursor-pointer transition-shadow hover:shadow-lg">
+      <CardBody className="p-0 overflow-hidden" onClick={handleNavigate}>
         <div
           className="relative w-full aspect-square bg-white flex items-center justify-center"
           style={{ minHeight: 0, height: 0, paddingBottom: "100%" }}
@@ -114,18 +110,27 @@ const TarjetaProducto: React.FC<{ producto: Producto }> = ({ producto }) => {
               Sin stock
             </Chip>
           )}
+          {tieneDescuento && (
+            <Chip color="primary" size="sm" className="absolute top-2 right-2 z-10">
+              -{producto.descuento}%
+            </Chip>
+          )}
         </div>
         <div className="p-4">
           <span className="block text-xs text-default-400 mb-1">{producto.marca}</span>
           <h3 className="font-medium text-foreground/90 line-clamp-1">{producto.nombre}</h3>
           <div className="flex items-center gap-2 mt-2 mb-1">
-            {renderStars(producto.rating)}
-            {typeof producto.rating === "number" && (
-              <span className="text-xs text-default-400">({producto.rating.toFixed(1)})</span>
-            )}
+            {/* ...renderStars... */}
           </div>
           <div className="flex items-center gap-2">
-            <span className="font-semibold">{formatoCLP(producto.valor)}</span>
+            {tieneDescuento ? (
+              <>
+                <span className="font-semibold text-success-600 text-lg">{formatoCLP(producto.precio_con_descuento!)}</span>
+                <span className="line-through text-default-400 text-sm">{formatoCLP(producto.valor)}</span>
+              </>
+            ) : (
+              <span className="font-semibold">{formatoCLP(producto.valor)}</span>
+            )}
           </div>
         </div>
       </CardBody>
@@ -136,7 +141,10 @@ const TarjetaProducto: React.FC<{ producto: Producto }> = ({ producto }) => {
           variant="flat"
           startContent={<Icon icon="lucide:shopping-cart" width={18} height={18} />}
           disabled={!producto.disponible}
-          onClick={() => agregarAlCarrito(producto.id)}
+          onClick={e => {
+            e.stopPropagation();
+            agregarAlCarrito(producto.id);
+          }}
         >
           Agregar al carrito
         </Button>
@@ -181,6 +189,8 @@ const CatalogPage: React.FC<{ categoriaInicial?: string | null }> = ({ categoria
             categoria: item.categoria,
             disponible: !!item.disponible,
             rating: typeof item.rating === "number" ? item.rating : Math.random() * 2 + 3,
+            descuento: item.descuento,
+            precio_con_descuento: item.precio_con_descuento,
           }))
         );
         setCargando(false);

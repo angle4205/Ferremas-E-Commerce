@@ -334,6 +334,8 @@ class Producto(models.Model):
     )
     fecha_creacion = models.DateTimeField(default=timezone.now, verbose_name=_("Fecha de creación"))
     fecha_actualizacion = models.DateTimeField(auto_now=True, verbose_name=_("Fecha de actualización"))
+    # --- NUEVO CAMPO PARA DESCUENTO ---
+    descuento = models.FloatField(default=0, verbose_name=_("Descuento (%)"), help_text=_("Porcentaje de descuento aplicado al producto"))
 
     class Meta:
         verbose_name = _("Producto")

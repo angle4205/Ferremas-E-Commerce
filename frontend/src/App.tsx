@@ -25,6 +25,7 @@ import ProfilePage from "./pages/ProfilePage";
 import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
 import CartModal from "./components/CartModal";
 import PagoExitoPage from "./pages/PagoExitoPage";
+import ProductDetail from "./pages/ProductDetail";
 import { Icon } from "@iconify/react/dist/iconify.js";
 import { Routes, Route, useNavigate, Navigate, useLocation } from "react-router-dom";
 
@@ -413,6 +414,7 @@ export default function App() {
             }
           />
           <Route path="/pago/exito" element={<PagoExitoPage />} />
+          <Route path="/producto/:id" element={<ProductDetail />} />
         </Routes>
       </main>
 

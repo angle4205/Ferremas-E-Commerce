@@ -51,6 +51,7 @@ const Sidebar: React.FC<SidebarProps> = ({ rol, subrol, onNavigate }) => {
     // Solo bodeguero
     { label: "Órdenes Asignadas", page: "ordenes-bodeguero", icon: "lucide:clipboard-list", roles: ["EMPLEADO"], subroles: ["BODEGUERO"] },
     // Solo admin
+    { label: "Órdenes", page: "ordenes", icon: "lucide:clipboard-list", roles: ["ADMINISTRADOR"] },
     { label: "Empleados", page: "employees", icon: "lucide:users", roles: ["ADMINISTRADOR"] },
     { label: "Descuentos", page: "discounts", icon: "lucide:percent", roles: ["ADMINISTRADOR"] },
     { label: "Historial de Turnos", page: "shifts", icon: "lucide:history", roles: ["ADMINISTRADOR"] },

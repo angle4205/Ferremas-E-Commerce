@@ -8,6 +8,7 @@ from rest_framework import status, permissions
 from rest_framework.generics import get_object_or_404
 from rest_framework.pagination import PageNumberPagination
 from .models import Producto, UserProfile, Pedido, ItemPedido, Categoria, Cliente, TurnoEmpleado
+from .permissions import IsAdminOrEmpleadoEspecial, IsSoloAdmin, IsEmpleadoSubrol
 from django.utils import timezone
 from django.db import models
 from django.contrib.auth import authenticate, login, logout
@@ -19,6 +20,7 @@ from django.db.models import Sum, Count
 from .models import Cart, ItemCarrito
 import stripe
 import openpyxl
+from rest_framework.generics import RetrieveAPIView
 from django.http import HttpResponse
 from .serializers import (
     ProductoSerializer,
@@ -44,58 +46,6 @@ class LandingView(View):
             return FileResponse(open(index_path, "rb"), content_type="text/html")
         except FileNotFoundError:
             raise Http404("No se encontró index.html, ¿ejecutaste 'npm run build'?")
-
-# --- Permisos personalizados ---
-
-class IsEmpleado(permissions.BasePermission):
-    """Permite acceso solo a empleados autenticados."""
-
-    def has_permission(self, request, view):
-        return (
-            hasattr(request.user, "profile")
-            and getattr(request.user.profile.rol, "nombre", None) == "EMPLEADO"
-        )
-
-class IsBodeguero(permissions.BasePermission):
-    """Permite acceso solo a empleados con subrol BODEGUERO."""
-
-    def has_permission(self, request, view):
-        return (
-            hasattr(request.user, "profile")
-            and request.user.profile.tipo_empleado == "BODEGUERO"
-        )
-
-class IsContador(permissions.BasePermission):
-    """Permite acceso solo a empleados con subrol CONTADOR."""
-
-    def has_permission(self, request, view):
-        return (
-            hasattr(request.user, "profile")
-            and request.user.profile.tipo_empleado == "CONTADOR"
-        )
-
-class IsAdminEmpleado(permissions.BasePermission):
-    """Permite acceso solo a empleados con rol ADMINISTRADOR."""
-
-    def has_permission(self, request, view):
-        return (
-            hasattr(request.user, "profile")
-            and getattr(request.user.profile.rol, "nombre", None) == "ADMINISTRADOR"
-        )
-
-class IsAdminOrEmpleadoEspecial(permissions.BasePermission):
-    """
-    Permite acceso a admin y a empleados con subrol CONTADOR o BODEGUERO.
-    """
-    def has_permission(self, request, view):
-        user = request.user
-        profile = getattr(user, "profile", None)
-        if user.is_superuser or user.is_staff:
-            return True
-        if profile and getattr(profile.rol, "nombre", None) == "EMPLEADO":
-            # Permite acceso a ciertos subroles
-            return profile.tipo_empleado in ["CONTADOR", "BODEGUERO"]
-        return False
 
 # --- Helpers privados y mixins ---
 
@@ -235,6 +185,12 @@ class RegisterAPIView(APIView):
             {"success": True, "mensaje": "Usuario registrado correctamente"}
         )
 
+class ProductoDetailAPIView(APIView):
+    def get(self, request, pk):
+        producto = get_object_or_404(Producto, id=pk, disponible=True)
+        serializer = ProductoSerializer(producto, context={"request": request})
+        return Response(serializer.data)
+
 class CartAPIView(APIView):
     """
     Devuelve los items del carrito y el total.
@@ -351,7 +307,7 @@ class MarcarEntradaAPIView(APIView):
     Permite a cualquier empleado marcar su entrada a turno.
     """
 
-    permission_classes = [permissions.IsAuthenticated, IsEmpleado]
+    permission_classes = [IsAuthenticated, IsEmpleadoSubrol]
 
     def post(self, request):
         empleado = getattr(request.user, "profile", None)
@@ -372,7 +328,7 @@ class MarcarSalidaAPIView(APIView):
     Permite a cualquier empleado marcar su salida de turno.
     """
 
-    permission_classes = [permissions.IsAuthenticated, IsEmpleado]
+    permission_classes = [IsAuthenticated, IsEmpleadoSubrol]
 
     def post(self, request):
         empleado = getattr(request.user, "profile", None)
@@ -392,8 +348,7 @@ class PerfilEmpleadoAPIView(APIView):
     """
     Devuelve el perfil y subrol del usuario autenticado.
     """
-
-    permission_classes = [permissions.IsAuthenticated, IsEmpleado]
+    permission_classes = [IsAuthenticated, IsEmpleadoSubrol]
 
     def get(self, request):
         empleado = getattr(request.user, "profile", None)
@@ -409,7 +364,7 @@ class TurnoHistorialAPIView(APIView):
     Devuelve el historial de turnos del empleado autenticado.
     """
 
-    permission_classes = [permissions.IsAuthenticated, IsEmpleado]
+    permission_classes = [permissions.IsAuthenticated, IsEmpleadoSubrol]
 
     def get(self, request):
         empleado = getattr(request.user, "profile", None)
@@ -435,7 +390,7 @@ class BodegueroOrdenesAPIView(APIView):
     Permite al bodeguero ver sus pedidos asignados, paginados.
     """
 
-    permission_classes = [permissions.IsAuthenticated, IsBodeguero]
+    permission_classes = [permissions.IsAuthenticated, IsEmpleadoSubrol.with_subrol("BODEGUERO")]
 
     def get(self, request):
         bodeguero = request.user
@@ -464,7 +419,7 @@ class BodegueroOrdenEstadoAPIView(APIView):
     Permite al bodeguero cambiar el estado de un pedido asignado, validando el nuevo estado y la transición.
     """
 
-    permission_classes = [permissions.IsAuthenticated, IsBodeguero]
+    permission_classes = [permissions.IsAuthenticated, IsEmpleadoSubrol.with_subrol("BODEGUERO")]
     ESTADOS_PERMITIDOS = ["PREPARACION", "ENVIADO", "ENTREGADO", "LISTO_RETIRO"]
 
     def patch(self, request, pedido_id):
@@ -504,7 +459,7 @@ class ContadorReportesAPIView(APIView):
     Permite al contador ver reportes financieros básicos.
     """
 
-    permission_classes = [permissions.IsAuthenticated, IsContador]
+    permission_classes = [permissions.IsAuthenticated, IsEmpleadoSubrol.with_subrol("CONTADOR")]
 
     def get(self, request):
         total_ventas = (
@@ -529,7 +484,7 @@ class AdminEmpleadosListAPIView(APIView):
     Permite al administrador listar todos los empleados, paginados.
     """
 
-    permission_classes = [permissions.IsAuthenticated, IsAdminEmpleado]
+    permission_classes = [permissions.IsAuthenticated, IsSoloAdmin]
 
     def get(self, request):
         empleados = (
@@ -553,7 +508,7 @@ class AdminEmpleadoDetailAPIView(APIView):
     Permite al administrador ver el detalle de un empleado.
     """
 
-    permission_classes = [permissions.IsAuthenticated, IsAdminEmpleado]
+    permission_classes = [permissions.IsAuthenticated, IsSoloAdmin]
 
     def get(self, request, empleado_id):
         empleado = get_object_or_404(
@@ -634,7 +589,7 @@ class AdminOverviewAPIView(APIView):
 # --- Órdenes para dashboard admin: listar, asignar, modificar ---
 
 class AdminOrderListAPIView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsAdminOrEmpleadoEspecial]
+    permission_classes = [IsAuthenticated, IsAdminOrEmpleadoEspecial]
 
     def get(self, request):
         pedidos = Pedido.objects.select_related("cliente", "bodeguero_asignado").order_by("-fecha_creacion")
@@ -642,7 +597,7 @@ class AdminOrderListAPIView(APIView):
         return Response(serializer.data)
 
 class AdminOrderAssignAPIView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsAdminEmpleado]
+    permission_classes = [permissions.IsAuthenticated, IsSoloAdmin]
 
     def post(self, request, pedido_id):
         pedido = get_object_or_404(Pedido, id=pedido_id)
@@ -672,7 +627,29 @@ class AdminOrderUpdateAPIView(APIView):
         serializer = PedidoDetailSerializer(pedido)
         return Response(serializer.data)
 
-# --- Reportes financieros para admin ---
+# Descuentos para productos
+
+class AdminDiscountsAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsSoloAdmin]
+
+    def post(self, request):
+        productos_ids = request.data.get("productos", [])
+        descuento = request.data.get("descuento")
+        if not productos_ids or descuento is None:
+            return Response({"success": False, "mensaje": "Datos incompletos."}, status=400)
+        try:
+            descuento = float(descuento)
+            if descuento <= 0 or descuento >= 100:
+                return Response({"success": False, "mensaje": "Descuento inválido."}, status=400)
+        except Exception:
+            return Response({"success": False, "mensaje": "Descuento inválido."}, status=400)
+        productos = Producto.objects.filter(id__in=productos_ids)
+        for prod in productos:
+            prod.descuento = descuento
+            prod.save()
+        return Response({"success": True, "mensaje": "Descuento aplicado correctamente."})
+
+# Reportes financieros para admin
 
 class AdminFinancialReportAPIView(APIView):
     permission_classes = [IsAuthenticated, IsAdminOrEmpleadoEspecial]
@@ -757,7 +734,6 @@ class CSRFTokenView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        # El decorador ya se encarga de setear la cookie
         return JsonResponse({"success": True, "mensaje": "CSRF cookie set"})
 
 class StripePaymentAPIView(APIView):
@@ -769,7 +745,6 @@ class StripePaymentAPIView(APIView):
     def post(self, request):
         stripe.api_key = settings.STRIPE_SECRET_KEY
 
-        # Obtén el carrito activo del usuario
         try:
             cart = Cart.objects.get(user=request.user, estado="ACTIVO")
         except Cart.DoesNotExist:
@@ -780,7 +755,6 @@ class StripePaymentAPIView(APIView):
         if total_stripe < 50:
             return Response({"error": "El monto mínimo para pagar es $50 CLP."}, status=400)
 
-        # Construye los items para Stripe Checkout
         line_items = []
         for item in cart.items.all():
             line_items.append({
@@ -794,7 +768,7 @@ class StripePaymentAPIView(APIView):
                 "quantity": item.cantidad,
             })
 
-        # URL de éxito y cancelación (ajusta según tu frontend)
+        # URL de éxito y cancelación
         success_url = settings.FRONTEND_URL + "/pago/exito"
         cancel_url = settings.FRONTEND_URL + "/carrito"
 
@@ -811,6 +785,6 @@ class StripePaymentAPIView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=500)
 
-        # Aquí puedes crear el Pedido y Pago como antes si lo necesitas
+        
 
         return Response({"sessionId": session.id})

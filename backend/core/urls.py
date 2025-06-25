@@ -18,6 +18,7 @@ from django.urls import path
 from .views import (
     LandingView,
     ProductoListAPIView,
+    ProductoDetailAPIView,
     MarcarEntradaAPIView,
     MarcarSalidaAPIView,
     PerfilEmpleadoAPIView,
@@ -43,6 +44,7 @@ from .views import (
     CartItemDeleteAPIView,
     CartItemCreateAPIView,
     StripePaymentAPIView,
+    AdminDiscountsAPIView,
 )
 from django.conf import settings
 from django.conf.urls.static import static
@@ -67,7 +69,8 @@ urlpatterns = [
 
     # API Productos y Categorías
     path('api/productos/', ProductoListAPIView.as_view(), name='productos-list'),
-    path("api/categorias/", CategoriaListAPIView.as_view()),
+    path('api/productos/<int:pk>/', ProductoDetailAPIView.as_view()),
+    path("api/categorias/", CategoriaListAPIView.as_view(), name="categorias-list"),
 
     # API Carrito
     path("api/cart/", CartAPIView.as_view(), name="cart"),
@@ -100,6 +103,7 @@ urlpatterns = [
     path('api/admin/overview/', AdminOverviewAPIView.as_view(), name='admin-overview'),
     path('api/admin/empleados/', AdminEmpleadosListAPIView.as_view(), name='admin-empleados-list'),
     path('api/admin/empleados/<int:empleado_id>/', AdminEmpleadoDetailAPIView.as_view(), name='admin-empleado-detalle'),
+    path('api/admin/discounts/', AdminDiscountsAPIView.as_view(), name='admin-discounts'),
 ]
 
 # Soporte para archivos media en desarrollo

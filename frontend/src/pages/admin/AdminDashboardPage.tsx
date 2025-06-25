@@ -84,7 +84,7 @@ const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
             </div>
           </>
         );
-      case "orders":
+      case "ordenes":
         return <OrdersTable />;
       case "employees":
         return <EmployeesPage />;

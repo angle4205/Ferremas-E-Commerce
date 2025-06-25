@@ -8,6 +8,7 @@ from .models import (
     ItemCarrito,
 )
 from django.contrib.auth.models import User
+from decimal import Decimal, ROUND_DOWN
 
 # --- ProductoSerializer (para listado de productos) ---
 
@@ -15,22 +16,43 @@ class ProductoSerializer(serializers.ModelSerializer):
     imagen_principal = serializers.ImageField(use_url=True)
     marca = serializers.StringRelatedField()
     categoria = serializers.StringRelatedField()
+    descuento = serializers.FloatField(required=False)
+    precio_con_descuento = serializers.SerializerMethodField()
 
     class Meta:
         model = Producto
         fields = [
-            "id", "nombre", "marca", "valor", "imagen_principal", "categoria", "disponible", "stock"
+            "id", "nombre", "marca", "valor", "imagen_principal", "categoria",
+            "disponible", "stock", "descuento", "precio_con_descuento"
         ]
+
+    def get_precio_con_descuento(self, obj):
+        valor = Decimal(obj.valor)
+        descuento = Decimal(str(obj.descuento or 0))
+        if descuento > 0:
+            precio_desc = valor * (Decimal('1') - descuento / Decimal('100'))
+            return int(precio_desc.to_integral_value(rounding=ROUND_DOWN))
+        return int(valor.to_integral_value(rounding=ROUND_DOWN))
 
 # --- ProductoEnItemPedidoSerializer (producto embebido en item de pedido) ---
 
 class ProductoEnItemPedidoSerializer(serializers.ModelSerializer):
     marca = serializers.StringRelatedField()
     categoria = serializers.StringRelatedField()
+    descuento = serializers.FloatField(required=False)
+    precio_con_descuento = serializers.SerializerMethodField()
 
     class Meta:
         model = Producto
-        fields = ["id", "nombre", "marca", "categoria", "valor"]
+        fields = ["id", "nombre", "marca", "categoria", "valor", "descuento", "precio_con_descuento"]
+
+    def get_precio_con_descuento(self, obj):
+        valor = Decimal(obj.valor)
+        descuento = Decimal(str(obj.descuento or 0))
+        if descuento > 0:
+            precio_desc = valor * (Decimal('1') - descuento / Decimal('100'))
+            return int(precio_desc.to_integral_value(rounding=ROUND_DOWN))
+        return int(valor.to_integral_value(rounding=ROUND_DOWN))
 
 # --- ItemPedidoSerializer (item de pedido, incluye producto embebido) ---
 
